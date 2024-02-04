@@ -1668,7 +1668,7 @@ function clagess_create_input_form( parent_id )
 	cell = table1_rowPIA.insertCell(-1);
 	label = document.createElement("label");
 	label.for = "PIA:";
-	label.innerHTML = "PIA: ($)";
+	label.innerHTML = "PIA (montly benefit at Full Retirement Age): ($)";
 	cell.appendChild(label);
 
 	input = document.createElement("input");
