@@ -983,6 +983,7 @@ function clagess_generate_table_bank_balance( parent_id, append0_or_replace1, bi
 						text: "Birth: " + String(months_user[birth_month_user]) + " " + String(birth_year) +
 							", Investment Interest Rate: " + String(interest_percent) + "%, COLA: "+ String(cola_percent) + "%, PIA: $" + String(pia) +
 							(spendit ? (", spending $" + spendit + " per month") : "") +
+							(paydownbalance ? (", initial loan balance of $" + paydownbalance) : "") +
 							(borrow_irate ? (", paying interest at " + borrow_irate +"% annually on negative balances") : "")
 					},
 					tooltip: {
