@@ -248,10 +248,10 @@ function clagess_best_month_bank_balance( birth_year, age_at_death, interest_rat
 }
 
 
-function clagess_generate_table_best_bank_balance( table_element, canvas_element, birth_year, birth_month_user=1, cola=0, pia=1000, age_at_death=100)
+function clagess_generate_table_best_bank_balance( table_element, canvas_element, title, birth_year, birth_month_user=1, cola=0, pia=1000, age_at_death=100)
 {
 	let birth_month_adj = birth_month_user-1; // Users months are 1..12. Internally we use 0..11.
-	if(0) { console.log("XXXXXX   Enter clagess_generate_table_best_bank_balance(table_element=", table_element, ", canvas_element=", canvas_element, ", birth_year=", birth_year, " birth_month: (user=", birth_month_user, ",adjusted=", birth_month_adj, ", cola=", cola, ", pia=", pia, ", age_at_death=", age_at_death ); }
+	if(1) { console.log("XXXXXX   Enter clagess_generate_table_best_bank_balance(table_element=", table_element, ", canvas_element=", canvas_element, ", title=", title, ", birth_year=", birth_year, " birth_month: (user=", birth_month_user, ",adjusted=", birth_month_adj, ", cola=", cola, ", pia=", pia, ", age_at_death=", age_at_death ); }
 
 	let col_hdrs = [];
 	let row_hdrs = [];
@@ -283,7 +283,9 @@ function clagess_generate_table_best_bank_balance( table_element, canvas_element
 
 	let new_table = clagess_generate_html_table(table_element, data_2d, col_hdrs, row_hdrs, data_2d_mo, null, null, data_2d_bgc );
 	table_caption = new_table.createCaption();
-	table_caption.innerHTML = "Best claiming age (year:month) for a given situation of interest rates (columns), longevity (rows), " +
+	table_caption.innerHTML = title;
+	if (title !== "") { table_caption.innerHTML += "<br>"; }
+	table_caption.innerHTML += "Best claiming age (year:month) for a given situation of interest rates (columns), longevity (rows), " +
 				"COLA ("+ parseFloat(cola).toFixed(1)+ "%) for birth month of "+ months_user[birth_month_user] +
 				" " + birth_year+ ". (Based on analyzing bank account balance at indicated birthdays). PIA=$"+pia+"." +
 				"<br>Note: Assumes benefits are paid when due (typically they are paid the next month).";
@@ -479,11 +481,11 @@ class BaseReport { // Base class for a report in the BaseFormReports
 		return the_row;
 	}
 
-	get_element( arg_name )
+	get_element( arg_name, form_id_suffix = "" )
 	{
 		let the_row = this.get_argument(arg_name);
 		if (the_row === null) { console.log("ERROR: get_argument(", arg_name, ") fails" ); }
-		let the_element = document.getElementById( the_row.form_id );
+		let the_element = document.getElementById( the_row.form_id + form_id_suffix );
 		return the_element;
 	}
 
@@ -537,7 +539,17 @@ class Report_BankBalanceTable extends BaseReport {
 		let claiming_ages = claiming_ages_string_to_values( this.get_element("Claiming-Ages").value );
 		let pia = this.get_element("PIA");
 		let age_at_death = this.get_element("Age at Death");
-		let arrears_checked = this.get_element("Arrears");
+
+		let arrears_value = "0";
+		if (1) { // DVO NOTE: I hope there is a cleaner way to do this that I haven't discovered yet.
+			let arrears_a = this.get_element("Arrears", "_A");
+			let arrears_b = this.get_element("Arrears", "_B");
+
+			if (arrears_a.checked) { arrears_value = arrears_a.value; }
+			if (arrears_b.checked) { arrears_value = arrears_b.value; }
+		}
+
+
 		let paydownbalance = this.get_element("Pay Down Balance");
 		let borrow_irate = this.get_element("Borrow Interest Rate");
 		let spendit = this.get_element("Monthly Spending");
@@ -553,7 +565,8 @@ class Report_BankBalanceTable extends BaseReport {
 			//Number(interest_rate.value),
 			interest_rate_array,
 			Number(cola.value), Number(pia.value),
-			Number(arrears_checked.value), error_id,
+			Number(arrears_value), 
+			error_id,
 			Number(paydownbalance.value), Number(borrow_irate.value),
 			Number(spendit.value),
 			Number(animation_speed.value), Number(max_animation_skew.value)
@@ -602,7 +615,7 @@ class Report_OptimumRetirementClaimingAgeSummaryChart extends BaseReport {
 		let cola = this.get_element("COLA");
 		let pia = this.get_element("PIA");
 		let age_at_death = this.get_element("Age at Death");
-		let new_element = clagess_generate_table_best_bank_balance( table_element, canvas_element,
+		let new_element = clagess_generate_table_best_bank_balance( table_element, canvas_element, title.value,
 			Number(birth_year.value), Number(birth_month.value), Number(cola.value), Number(pia.value), Number(age_at_death.value), "form1_errors" );
 		// DVO HELP - fix "form1_errors" above
 	}
@@ -748,7 +761,7 @@ class FormRow
 				latest_element = table_row.insertCell(-1);
 				parent_element = latest_element;
 			} else if (attr === "form_id") {
-				latest_element.setAttribute("id", this.form_id );
+				latest_element.setAttribute("id", this.form_id + String(value) );
 			} else if (attr === "click") {
 				latest_element.addEventListener("click", value );
 			} else if (attr === "onchange") {
@@ -942,7 +955,6 @@ class BaseFormReports // Represents a Table, and FORM for one or more related re
 		let report = this.get_report_type();
 		let table_element = this.get_report_table_element ( parent_id );
 		let canvas_element = this.get_report_canvas_element ( parent_id );
-		console.log("In on_action: get_report_table_element(parent_id=", parent_id, "): ", table_element );
 		report.RunReport( parent_id, table_element, canvas_element, this.error_id, this.message_id );
 	}
 
@@ -1005,7 +1017,7 @@ class ClagessFormReports extends BaseFormReports
 
 	new ClagessFormRow(this, "CLAGESS", false, [  "innerHTML", "CLAGESS", "nextCell", "nop", "colspan", 3,
 			"innerHTML", "<b>Cl</b>aiming <b>Ag</b>e <b>E</b>stimator for <b>S</b>ocial <b>S</b>ecurity retirement benefits " +
-			"&nbsp;<small>version 0.21</small>",
+			"&nbsp;<small>version 0.22</small>",
 	], 0);
 
 		// DVO HELP - need to tweak the following to read the reports somehow from the BaseReport objects
@@ -1140,7 +1152,6 @@ class ClagessFormReports extends BaseFormReports
 	let claiming_ages_row = new ClagessFormRow(this, "Claiming-Ages", true, [ "innerHTML", "Claiming-Ages", "trclassadd", "clagess_table_row_claimingages",
 		"nextCell", "nop",
 		"element2", "input", "form_id", "", "type", "text", /*"id", "form1_claiming_id",*/ "value", "62 67 70",
-		//"onchange", "form1_onchange_claiming_ages(\"form1_claiming_id\")", // DVO HELP
 		"onchange", () => { this.onchange_claiming_ages(); },
 		"onchange", () => { claiming_ages_row.on_arg_change(claiming_ages_row.form_id); },
 		"nextCell", "nop", "nextCell", "nop", "class", "description",
@@ -1186,10 +1197,10 @@ class ClagessFormReports extends BaseFormReports
 
 	new ClagessFormRow(this, "Arrears", true, [ "innerHTML", "Arrears", "trclassadd", "clagess_table_arrears",
 		"nextCell", "nop",
-		"element3", "input", "form_id", "", "type", "radio", "name", "form1_arrears_name", /* "id", "form1_arrears_id_0",*/ "value", 0, "checked", "true",
+		"element3", "input", "form_id", "_A", "type", "radio", "name", "form1_arrears_name", "value", 0, "checked", "true",
 		"element3", "label", "innerHTML", "When Due ",
 
-		"element3", "input", "type", "radio", "name", "form1_arrears_name", /* "id", "form1_arrears_id_1",*/ "value", 1, // DVO HELP - two ids
+		"element3", "input", "form_id", "_B", "type", "radio", "name", "form1_arrears_name", "value", 1,
 		"element3", "label", "innerHTML", "When Paid ",
 
 		"nextCell", "nop", "nextCell", "nop", "class", "description",
@@ -1318,18 +1329,8 @@ class ClagessFormReports extends BaseFormReports
 
 	onchange_claiming_ages()
 	{
-		console.log("ClagessFormReports.onchange_claiming_ages()");
-
-		let claiming_ages = document.getElementById(claiming_age_id);
-		if (claiming_ages == null) { console.log("ERROR - what to do??? claiming_age_id (", claiming_age_id,") in function form1_onchange_claiming_ages(), returns null"); }
-
-		claiming_age_id = this.get_element("Claiming-Ages");
-
-		console.log("claiming_age_id=", claiming_age_id );
-
+		let claiming_ages = this.get_element("Claiming-Ages");
 		let  claiming_age_values = claiming_ages_string_to_values( claiming_ages.value );
-		console.log("    claiming_ages.value=", claiming_ages.value );
-		console.log("    claiming_age_values=", claiming_age_values );
 
 		if ((claiming_age_values.length == 3) && (claiming_age_values[0] < claiming_age_values[1]) &&  (claiming_age_values[2] < claiming_age_values[1]) ) {
 			let start = claiming_age_values[0];
@@ -1344,7 +1345,7 @@ class ClagessFormReports extends BaseFormReports
 				new_string2 += clagess_to_years_months( the_value, 3 )    + " ";
 			}
 			claiming_ages.value = new_string2;
-			console.log("    new string=", claiming_ages.value );
+			// console.log("    new string=", claiming_ages.value );
 		}
 	}
 
@@ -1801,15 +1802,11 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 			odd_column_group = ! odd_column_group;
 			let th = document.createElement("th");
 			th.innerHTML = "Interest on Balance ($)";
-			if (0) { // DVO HELP
 			th.title = (paydownbalance == 0)
-				?  ("Monthly interest earned on the previous Bank Balance. Annual interest rate is "+interest_percent+"%.")
+				?  ("Monthly interest earned on the previous Bank Balance. Annual interest rate is "+irate+"%.")
 				:  ("Monthly interest - initially amount charged on the loan (negative) Bank Balance at " + borrow_irate +
-					"%, and then after the load is paid off, the interest earned on the positive Bank Balance at " + interest_percent + "%.")
+					"%, and then after the load is paid off, the interest earned on the positive Bank Balance at " + irate + "%.")
 				;
-			} else {
-				th.title = "DVO HELP";
-			}
 			th.classList.add(odd_column_group ? "odd_column_group" : "even_column_group");
 			hrow3.appendChild(th);
 
