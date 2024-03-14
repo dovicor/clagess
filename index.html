@@ -6,8 +6,10 @@
 <html>
 	<head>
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js" integrity="sha512-ZwR1/gSZM3ai6vCdI+LVF1zSq/5HznD3ZSTk7kajkaj4D292NLuduDCO1c/NT8Id+jE58KYLKT7hXnbtryGmMg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/3.0.1/chartjs-plugin-annotation.min.js" integrity="sha512-Hn1w6YiiFw6p6S2lXv6yKeqTk0PLVzeCwWY9n32beuPjQ5HLcvz5l2QsP+KilEr1ws37rCTw3bZpvfvVIeTh0Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
 
+		<script src="https://dovicor.github.io/clagess/ss_period_life_table_2020.js"></script>
 		<script src="https://dovicor.github.io/clagess/clagess.js"></script>
 
 		<style>
@@ -68,10 +70,17 @@ table.clagess_control_form    {
 				}
 table.clagess_control_form tr.clagess_disabled_row   {
 				background-color: #6D5837;
-				background-color: #7A633E;;
+				background-color: #7A633E;
 				color: #292115;
 				color: #362C1B;
+				display: none;
 			}
+table.clagess_control_form tr.clagess_hidden_row   {
+				background-color: #7A633E;
+				color: #362C1B;
+				display: none;
+			}
+
 table.clagess_control_form .description {
 				background-color: var(--color_scheme_B_D);
 				font-size: smaller;
@@ -89,23 +98,23 @@ table.clagess_control_form .description {
 				//font-size: 125%;
 			}
 
-table#clagess_bank_balance_table { background-color: var(--color_scheme_A_H); } /* Basically just the grid lines */
-table#clagess_bank_balance_table th { background-color: var(--color_scheme_A_K); }
+table.clagess_bank_balance_table { background-color: var(--color_scheme_A_H); } /* Basically just the grid lines */
+table.clagess_bank_balance_table th { background-color: var(--color_scheme_A_K); }
 
-table#clagess_bank_balance_table th.odd_column_group { background-color: var(--color_scheme_A_I); }
-table#clagess_bank_balance_table th.even_column_group{ background-color: var(--color_scheme_A_G); }
-table#clagess_bank_balance_table td {
+table.clagess_bank_balance_table th.odd_column_group { background-color: var(--color_scheme_A_I); }
+table.clagess_bank_balance_table th.even_column_group{ background-color: var(--color_scheme_A_G); }
+table.clagess_bank_balance_table td {
 				background-color: #red; /* Matches Nothing? */
 				text-align: center;
 }
-table#clagess_bank_balance_table td.odd_column_group { background-color: var(--color_scheme_A_D); }
-table#clagess_bank_balance_table td.even_column_group { background-color: var(--color_scheme_A_B); }
-table#clagess_bank_balance_table .zero_dollars { color: var(--color_scheme_A_K); }
-table#clagess_bank_balance_table .negative_dollars {
+table.clagess_bank_balance_table td.odd_column_group { background-color: var(--color_scheme_A_D); }
+table.clagess_bank_balance_table td.even_column_group { background-color: var(--color_scheme_A_B); }
+table.clagess_bank_balance_table .zero_dollars { color: var(--color_scheme_A_K); }
+table.clagess_bank_balance_table .negative_dollars {
 				background-color: #F0E0E0;
 				color: #FF0000;
 }
-table#clagess_bank_balance_table .notes {
+table.clagess_bank_balance_table .notes {
 				background-color: var(--color_scheme_A_C);
 				background-color: var(--color_scheme_A_K);
 				font-size: smaller;
@@ -113,14 +122,19 @@ table#clagess_bank_balance_table .notes {
 }
 
 
-table#clagess_payment_table    { background-color: var(--color_scheme_C_D); }
-table#clagess_payment_table th { background-color: var(--color_scheme_C_H); }
-table#clagess_payment_table td { background-color: var(--color_scheme_C_C); text-align: center; }
-table#clagess_payment_table .notes {
+table.clagess_payment_table    { background-color: var(--color_scheme_C_D); }
+table.clagess_payment_table th { background-color: var(--color_scheme_C_H); }
+table.clagess_payment_table td { background-color: var(--color_scheme_C_C); text-align: center; }
+table.clagess_payment_table .notes {
 				background-color: var(--color_scheme_C_C);
 				background-color: var(--color_scheme_C_K);
 				font-size: smaller;
 				text-align: left;
+}
+
+table.clagess_bank_balance_table thead { /* Fixed header, but the body scrolls vertically */
+				top: 0;
+				position: sticky;
 }
 
 #disclaimer {
@@ -138,7 +152,9 @@ table#clagess_payment_table .notes {
 		<div class="zz_young"></div> <div class="zz_old"></div> <!-- These divs are somehow required to enable the zz_young and zz_old (above) to work. -->
 
 
+		<!--
 		<br>CLAGESS: Claiming Age Estimator for Social Security retirement benefits
+		-->
 
 		<div id="clagess_control_form"></div> <!-- The generate report(s) will be attached here. -->
 		<script>var new_table = clagess_create_input_form( "clagess_control_form" );</script>
