@@ -509,7 +509,9 @@ class Report_BankBalanceTable extends BaseReport {
 		super(form_reports, "BankBalanceTable", "Bank Balance per Month Table",
 			["CLAGESS", "Report Type", "Options", "Title", "Birth year", "Birth month", "COLA", "Investment Interest Rate",
 					"Claiming-Ages", "PIA", "Age at Death", "Arrears", "Pay Down Balance", "Borrow Interest Rate",
-					"Monthly Spending", "Animation Speed", "Max Animation Skew", /*"Table Placement", */
+					"Monthly Spending",
+					"Trust fund depletion year", "Trust fund depletion reduction",
+					"Animation Speed", "Max Animation Skew", /*"Table Placement", */
 					"Buttons", "Errors", "Messages"],
 			BankBalanceTable_description
 		);
@@ -553,6 +555,8 @@ class Report_BankBalanceTable extends BaseReport {
 		let paydownbalance = this.get_element("Pay Down Balance");
 		let borrow_irate = this.get_element("Borrow Interest Rate");
 		let spendit = this.get_element("Monthly Spending");
+		let tfdy = this.get_element("Trust fund depletion year");
+		let tfdr = this.get_element("Trust fund depletion reduction");
 		let animation_speed = this.get_element("Animation Speed");
 		let max_animation_skew = this.get_element("Max Animation Skew");
 
@@ -569,6 +573,7 @@ class Report_BankBalanceTable extends BaseReport {
 			error_id,
 			Number(paydownbalance.value), Number(borrow_irate.value),
 			Number(spendit.value),
+			Number(tfdy.value), Number(tfdr.value),
 			Number(animation_speed.value), Number(max_animation_skew.value)
 		);
 		return new_element;
@@ -1252,10 +1257,43 @@ class ClagessFormReports extends BaseFormReports
 	      	"title", ""
 	], 6,
 		(value) => {
-				if ( (value < -99999) || (value > 100000)) { return "Monthly Spending="+ value+ ", values seems out of range."; }
+				if ( (value < -99999) || (value > 100000)) { return "Monthly Spending="+ value+ ", value seems out of range."; }
 				return null;
 			}
 	);
+
+	let tfdy = new ClagessFormRow(this, "Trust fund depletion year", true, [ "innerHTML", "Trust fund depletion (year)", "trclassadd", "clagess_table_row_tfdy",
+		"nextCell", "nop",
+		"element2", "input", "form_id", "", "type", "text", "value", "",
+		"onchange", () => { tfdy.on_arg_change(spend_it.form_id); },
+		"nextCell", "nop", "nextCell", "nop", "class", "description",
+		"innerHTML", "<b>Optional</b>: Hypothetical - <i>If</i> the Social Security OASI Trust Fund is allowed (by Congress) to deplete, what <i>year</i> will this be in? " +
+				"Leave blank to disable. Otherwise, <b>Depletion Reduction</b> (below) is applicable.",
+	      	"title", ""
+	], 6,
+		(value) => {
+				if ( (value != "") && ((value < 1980) || (value > 2099))) { return "Trust fund depletion="+ value+ ", value seems out of range."; }
+				return null;
+			}
+	);
+
+
+	let tfdr = new ClagessFormRow(this, "Trust fund depletion reduction", true, [ "innerHTML", "Depletion Reduction (%)", "trclassadd", "clagess_table_row_tfdr",
+		"nextCell", "nop",
+		"element2", "input", "form_id", "", "type", "text", "value", 0,
+		"onchange", () => { tfdr.on_arg_change(spend_it.form_id); },
+		"nextCell", "nop", "nextCell", "nop", "class", "description",
+		"innerHTML", "<b>Optional</b>: Applicable only if <b>Trust fund depletion (year)</b> (above) is not blank: Payments are reduced by this percentage starting in the year identified." +
+				" 0% means no change.",
+	      	"title", ""
+	], 6,
+		(value) => {
+				if ( (value < -100) || (value > 100)) { return "Trust fund depletion reduction="+ value+ "%, value seems out of range."; }
+				return null;
+			}
+	);
+
+
 
 
 	let a_speed = new ClagessFormRow(this, "Animation Speed", true, [ "innerHTML", "Animation Speed", "trclassadd", "clagess_table_row_animation_speed",
@@ -1582,7 +1620,9 @@ function clagess_generate_payment_table( table_element, canvas_element, title, b
 function clagess_generate_table_bank_balance( the_table, the_canvas, title, birth_year, birth_month_user=1,
 	claiming_age_array, max_age, interest_percent_array=[0],
 	cola_percent=0, pia=1000, arrears=0, messages_id=null,
-	paydownbalance=0, borrow_irate=0, spendit=0, animation_speed=0, max_animation_skew_ms = 3000)
+	paydownbalance=0, borrow_irate=0, spendit=0,
+	tfdy=0, tfdr_percent=0,
+	animation_speed=0, max_animation_skew_ms = 3000)
 // birth_month_user should be 1..12
 // claiming_age_array - array of values indicating year (and perhaps fractional month) - so 64+5/12 (=64.4166) means at age 64 years and 5 months.
 // arrears: SSA pays benefits about 1 month in arrears (i.e. February benefits are paid in March, etc.). Arrears=0 means to calculate and show
@@ -1595,7 +1635,9 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 		", max_age=", max_age, ", interest_percent_array=", interest_percent_array, ", cola_percent=", cola_percent,  ", pia=", pia,
 		", arrears=", arrears, ", messages_id=", messages_id,
 		", paydownbalance=", paydownbalance, ", borrow_irate=", borrow_irate,
-		", spendit=", spendit, ", animation_speed=", animation_speed, ", max_animation_skew_ms=", max_animation_skew_ms, ")" );
+		", spendit=", spendit,
+		", tfdy=", tfdy, ", tfdr=", tfdr_percent,
+		", animation_speed=", animation_speed, ", max_animation_skew_ms=", max_animation_skew_ms, ")" );
 	}
 	//let my_parent = document.getElementById(parent_id);
 	//if (my_parent == null) { console.log("ERROR: no element found with id=", parent_id); return null; }
@@ -1744,6 +1786,15 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 	hrow1.appendChild(th);
 	}
 
+	if ( (tfdy != "") && (tfdr_percent != 0) ) {
+		let th = document.createElement("th");
+		th.innerHTML = "Trust Fund factor";
+		th.title = "Applicable only if modeling the depletion the Social Security OASI trust fund. This table assumes a reduction of " +
+				tfdr_percent + "% starting in the year " + tfdy;
+		th.rowSpan = 3
+	hrow1.appendChild(th);
+	}
+
 	if (spendit != 0) {
 		let th = document.createElement("th");
 		th.innerHTML = "Spending ($)";
@@ -1838,6 +1889,7 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 	let accumulated_cola_percent = 0;
 	let cola_factor = 1;
 
+	let tf_factor = 1.0;
 	let tbody = the_table.createTBody();
 	let row_index = 0;
 	for (let months_after_62 = starting_months_after_62; months_after_62 <= num_months; months_after_62++) { // each row
@@ -1865,6 +1917,18 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 			header_cell = body_row.insertCell();
 			//if (months_after_62 >= 0) { header_cell.outerHTML = "<th>" + parseFloat(cola_factor).toFixed(3) + "</th>"; }
 			header_cell.outerHTML = "<th>" + ((months_after_62 >= 0) ? parseFloat(cola_factor).toFixed(3) : "") + "</th>";
+		}
+
+
+		if ( (tfdy != "") && (tfdr_percent != 0) ) {
+			let this_year = birth_year+62 + (birth_month_user-1+months_after_62+1)/12;
+			if (this_year >= tfdy) {
+				tf_factor = (100 - tfdr_percent) / 100;
+			}
+			console.log("months_after_62=", months_after_62, ", this_year=", this_year, ", tfdy=", tfdy, ", tf_factor=", tf_factor );
+
+			header_cell = body_row.insertCell();
+			header_cell.outerHTML = "<th>" + parseFloat(tf_factor).toFixed(2) + "</th>";
 		}
 
 		if (spendit != 0) {
@@ -1910,7 +1974,7 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 					let this_benefit = 0;
 					if ((months_after_62 >= (month_benefit_starts + arrears)) && (months_after_62 <= ((max_age-62)*12) ) ) {
 						//this_benefit = benefit_obj.benefit * pia * (1 + accumulated_cola_percent/100);
-						this_benefit = benefit_obj.benefit * pia * cola_factor;
+						this_benefit = benefit_obj.benefit * pia * cola_factor * tf_factor;
 					}
 					cell.innerHTML = parseFloat( this_benefit ).toFixed(2);
 					if (this_benefit ==  0) { cell.classList.add("zero_dollars"); }
@@ -1986,6 +2050,11 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 				"</b> at an annual interest rate of <b>" + borrow_irate +
 				"%</b>. This interest rate is continued until the loan balance is paid off, at which time the annual " +
 				"interest rate changes to <b>" + interest_rate_string + "%</b>.";
+	}
+
+	if ( (tfdy != "") && (tfdr_percent != 0) ) {
+		table_caption.innerHTML += "<br>Note: This <i>models</i> the Social Security Old-Age and Survivors Insurance (OASI) trust fund in the year " + tfdy +
+				" at which time benefits will be reduced by " + tfdr_percent + "%.";
 	}
 
 	if (the_canvas !== null) { // plot
