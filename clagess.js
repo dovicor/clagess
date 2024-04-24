@@ -49,13 +49,26 @@ function clagess_color_interpolate( value ) // TODO - I need to generalize this 
 		        Math.round(String( young_rgb_list[1] + value * (old_rgb_list[1] - young_rgb_list[1]) )) + "," +
 		        Math.round(String( young_rgb_list[2] + value * (old_rgb_list[2] - young_rgb_list[2]) )) + ")";
 }
-
+	/* The following accepts a string such as from an HTML form's text input box. If empty (or contains only whitespace)
+	 * then returns undefined. Otherwise, break into a list of what were space-separated sub-strings, and index into that
+	 * (using modulo if the index is larger then the list) to returned the selected sub-string.
+	 */
+function clagess_list_to_value( list_str, index )
+{
+	if (! list_str || /^\s*$/.test(list_str)) { return undefined; }
+	let substrings = list_str.split(/\s+/);
+	let substrings_length = substrings.length;
+	if (substrings_length === 0) { return undefined; }
+	let modified_index = index % substrings_length;
+	return substrings[ modified_index ];
+}
 
 const months_user = [ "Illegal value (0) - should be 1..12",
 		"January", "February", "March", "April", "May", "June",
 		"July", "August", "September", "October", "November", "December" ];
 
-let clagess_monthly_benefit = new Array(96+1); // 12 months X 8 years. Index by month of retirement start with index=0 at 62 years, 0 months - thru 70 years and 0 months. Dependent on birth-year.
+let clagess_monthly_benefit = new Array(96+1); // 12 months X 8 years + 1 month (i.e. 62nd b-day through 70th).
+ 						//Index by month of retirement start with index=0 at 62 years, 0 months - thru 70 years and 0 months. Dependent on birth-year.
 let clagess_birth_year = 0; // 0 is undefined. Should re-initialize clagess_monthly_benefit (above) when the birth-year changes.
 
 function clagess_set_birth_year( new_birth_year )
@@ -97,7 +110,8 @@ function string_ycm_to_num(ycm_string)
 // "72:6" should return 72.5 (i.e. 6th month of year 72).
 {
 	let values = ycm_string.split(":");
-	return Number(values[0]) + ( (values.length > 1) ? (Number(values[1])/12) : 0 );
+	let result = Number(values[0]) + ( (values.length > 1) ? (Number(values[1])/12) : 0 );
+	return result;
 }
 
 
@@ -118,6 +132,9 @@ function clagess_to_years_months(age, format=0)
 	}
 	if (format == 4) {
 		if (months==0) { return `${years} years`; }
+		return `${years} years  ${months} months`;
+	}
+	if (format == 5) {
 		return `${years} years  ${months} months`;
 	}
 	else { console.error("Internal error: unknown format in clagess_to_years_months(age="+String(age)+", format=" + String(months) + ")"); }
@@ -450,6 +467,10 @@ const ActuaryTable_description =
 			"Shows a graph of age versus survival rate for a U.S. individual on his or her 62nd birthday. " +
 			"Based on data from the Social Security Administration.";
 
+const Reverse_description = "Graph showing best claiming-age (Y axis) for each survival age (X axis).";
+
+const AtAge_description = "Graph showing accumulated bank balances (Y axis) for each claiming-age (X axis).";
+
 const Licensing_description = "Some legal notices associated with this software.";
 
 
@@ -511,7 +532,9 @@ class Report_BankBalanceTable extends BaseReport {
 					"Claiming-Ages", "PIA", "Age at Death", "Arrears", "Pay Down Balance", "Borrow Interest Rate",
 					"Monthly Spending",
 					"Trust fund depletion year", "Trust fund depletion reduction",
-					"Animation Speed", "Max Animation Skew", /*"Table Placement", */
+					"Animation Speed", "Max Animation Skew",
+					"Line Colors",
+					"Y Scale Max", "Y Scale Min",
 					"Buttons", "Errors", "Messages"],
 			BankBalanceTable_description
 		);
@@ -559,9 +582,16 @@ class Report_BankBalanceTable extends BaseReport {
 		let tfdr = this.get_element("Trust fund depletion reduction");
 		let animation_speed = this.get_element("Animation Speed");
 		let max_animation_skew = this.get_element("Max Animation Skew");
+		let line_colors = this.get_element("Line Colors").value;
+		let y_scale_min_element = this.get_element("Y Scale Min");
+		let y_scale_min = y_scale_min_element.value;
+		if (! y_scale_min || /^\s*$/.test(y_scale_min)) { y_scale_min = undefined; }
+		let y_scale_max_element = this.get_element("Y Scale Max");
+		let y_scale_max = y_scale_max_element.value;
+		if (! y_scale_max || /^\s*$/.test(y_scale_max)) { y_scale_max = undefined; }
 
 
-		let new_element = clagess_generate_table_bank_balance( table_element, canvas_element,
+		let new_element = clagess_generate_table_bank_balance_V1( table_element, canvas_element,
 			title.value,
 			Number(birth_year.value), Number(birth_month.value),
 			claiming_ages,
@@ -574,7 +604,9 @@ class Report_BankBalanceTable extends BaseReport {
 			Number(paydownbalance.value), Number(borrow_irate.value),
 			Number(spendit.value),
 			Number(tfdy.value), Number(tfdr.value),
-			Number(animation_speed.value), Number(max_animation_skew.value)
+			Number(animation_speed.value), Number(max_animation_skew.value),
+			line_colors,
+			y_scale_min, y_scale_max
 		);
 		return new_element;
 	}
@@ -641,6 +673,165 @@ class Report_ActuaryTable extends BaseReport {
 	}
 }
 
+
+class Report_Reverse extends BaseReport {
+	constructor (form_reports) {
+		super(form_reports, "Reverse", "Reverse",
+			["CLAGESS", "Report Type", "Options", "Title", "Birth year", "Birth month", "COLA", "Investment Interest Rate",
+					"PIA", "Pay Down Balance", "Borrow Interest Rate",
+					"Monthly Spending",
+					"Trust fund depletion year", "Trust fund depletion reduction",
+					"Line Colors",
+					"Y Scale Min", "Y Scale Max",
+					"Buttons", "Errors", "Messages"],
+			Reverse_description
+		);
+	}
+
+	RunReport(parent_id, table_element, canvas_element, error_id, message_id)
+	{
+		if (error_id != null) {
+			let error_element = document.getElementById( error_id );
+			error_element.innerHTML = "";
+		}
+		if (message_id != null) {
+			let message_element = document.getElementById( message_id );
+			message_element.innerHTML = "";
+		}
+
+		table_element.classList.add( "reverse_report_table" );
+
+		let title = this.get_element("Title");
+		let birth_year = this.get_element("Birth year");
+		let birth_month = this.get_element("Birth month");
+		let cola = this.get_element("COLA");
+		let interest_rate = this.get_element("Investment Interest Rate");
+		if ((interest_rate.value === '') || (interest_rate.value === ' ')) { interest_rate.value = 0; }
+		let interest_rate_array = [ interest_rate.value ];
+		let claiming_ages = claiming_ages_string_to_values(
+			"62:0 62:1 62:2 62:3 62:4 62:5 62:6 62:7 62:8 62:9 62:10 62:11 " +
+			"63:0 63:1 63:2 63:3 63:4 63:5 63:6 63:7 63:8 63:9 63:10 63:11 " +
+			"64:0 64:1 64:2 64:3 64:4 64:5 64:6 64:7 64:8 64:9 64:10 64:11 " +
+			"65:0 65:1 65:2 65:3 65:4 65:5 65:6 65:7 65:8 65:9 65:10 65:11 " +
+			"66:0 66:1 66:2 66:3 66:4 66:5 66:6 66:7 66:8 66:9 66:10 66:11 " +
+			"67:0 67:1 67:2 67:3 67:4 67:5 67:6 67:7 67:8 67:9 67:10 67:11 " +
+			"68:0 68:1 68:2 68:3 68:4 68:5 68:6 68:7 68:8 68:9 68:10 68:11 " +
+			"69:0 69:1 69:2 69:3 69:4 69:5 69:6 69:7 69:8 69:9 69:10 69:11 " +
+			"70:0" );
+		let pia = this.get_element("PIA");
+		let age_at_death = this.get_element("Age at Death");
+
+		let paydownbalance = this.get_element("Pay Down Balance");
+		let borrow_irate = this.get_element("Borrow Interest Rate");
+		let spendit = this.get_element("Monthly Spending");
+		let tfdy = this.get_element("Trust fund depletion year");
+		let tfdr = this.get_element("Trust fund depletion reduction");
+		let animation_speed = this.get_element("Animation Speed");
+		let max_animation_skew = this.get_element("Max Animation Skew");
+		let line_colors = this.get_element("Line Colors").value;
+		let y_scale_min_element = this.get_element("Y Scale Min");
+		let y_scale_min = y_scale_min_element.value;
+		if (! y_scale_min || /^\s*$/.test(y_scale_min)) { y_scale_min = undefined; }
+		let y_scale_max_element = this.get_element("Y Scale Max");
+		let y_scale_max = y_scale_max_element.value;
+		if (! y_scale_max || /^\s*$/.test(y_scale_max)) { y_scale_max = undefined; }
+
+
+		let new_element = clagess_generate_table_bank_balance_V3( table_element, canvas_element,
+			title.value,
+			Number(birth_year.value), Number(birth_month.value),
+			claiming_ages,
+			Number(age_at_death.value),
+			interest_rate_array,
+			Number(cola.value), Number(pia.value),
+			0,
+			error_id,
+			Number(paydownbalance.value), Number(borrow_irate.value),
+			Number(spendit.value),
+			Number(tfdy.value), Number(tfdr.value),
+			Number(animation_speed.value), Number(max_animation_skew.value),
+			line_colors,
+			y_scale_min, y_scale_max
+		);
+		return new_element;
+	}
+}
+
+
+class Report_AtAge extends BaseReport {
+	constructor (form_reports) {
+		super(form_reports, "At Age", "At Age",
+			["CLAGESS", "Report Type", "Options", "Title", "Birth year", "Birth month", "Target-Ages", "COLA", "Investment Interest Rate",
+					"PIA", "Pay Down Balance", "Borrow Interest Rate",
+					"Monthly Spending",
+					"Trust fund depletion year", "Trust fund depletion reduction",
+					"Animation Speed", "Max Animation Skew",
+					"Line Colors",
+					"Y Scale Max", "Y Scale Min",
+					"Buttons", "Errors", "Messages"],
+			AtAge_description
+		);
+	}
+
+	RunReport(parent_id, table_element, canvas_element, error_id, message_id)
+	{
+		if (error_id != null) {
+			let error_element = document.getElementById( error_id );
+			error_element.innerHTML = "";
+		}
+		if (message_id != null) {
+			let message_element = document.getElementById( message_id );
+			message_element.innerHTML = "";
+		}
+
+		table_element.classList.add( "clagess_at_age_table" );
+
+		let title = this.get_element("Title");
+		let birth_year = this.get_element("Birth year");
+		let birth_month = this.get_element("Birth month");
+		let target_ages = claiming_ages_string_to_values( this.get_element("Target-Ages").value );
+		let cola = this.get_element("COLA");
+		let interest_rate = this.get_element("Investment Interest Rate");
+		//let interest_rate_array = interest_rate.value.trim().split(/\s+/);
+		let interest_rate_array = interest_rate.value.split(/\s+/);
+		if ( (interest_rate_array.length === 1)  && (interest_rate_array[0] === '') ) { interest_rate_array = [0]; /* This special case of split() doesn't seem correct. */ }
+		let pia = this.get_element("PIA");
+
+		let paydownbalance = this.get_element("Pay Down Balance");
+		let borrow_irate = this.get_element("Borrow Interest Rate");
+		let spendit = this.get_element("Monthly Spending");
+		let tfdy = this.get_element("Trust fund depletion year");
+		let tfdr = this.get_element("Trust fund depletion reduction");
+		let animation_speed = this.get_element("Animation Speed");
+		let max_animation_skew = this.get_element("Max Animation Skew");
+		let line_colors = this.get_element("Line Colors").value;
+		let y_scale_min_element = this.get_element("Y Scale Min");
+		let y_scale_min = y_scale_min_element.value;
+		if (! y_scale_min || /^\s*$/.test(y_scale_min)) { y_scale_min = undefined; }
+		let y_scale_max_element = this.get_element("Y Scale Max");
+		let y_scale_max = y_scale_max_element.value;
+		if (! y_scale_max || /^\s*$/.test(y_scale_max)) { y_scale_max = undefined; }
+
+
+		let new_element = clagess_generate_table_bank_balance_V2( table_element, canvas_element,
+			title.value,
+			Number(birth_year.value), Number(birth_month.value),
+			Number(interest_rate.value),
+			Number(cola.value), Number(pia.value),
+			error_id,
+			Number(paydownbalance.value), Number(borrow_irate.value),
+			Number(spendit.value),
+			Number(tfdy.value), Number(tfdr.value),
+			Number(animation_speed.value), Number(max_animation_skew.value),
+			target_ages,
+			line_colors,
+			y_scale_min, y_scale_max
+		);
+		return new_element;
+	}
+
+}
+
 class Report_Licensing extends BaseReport {
 	constructor (form_reports) {
 		super(form_reports, "Licensing", "Licensing and Copyright notices",
@@ -650,7 +841,7 @@ class Report_Licensing extends BaseReport {
 	}
 	RunReport(parent_id, table_element, canvas_element, error_id, message_id)
 	{
-		clagess_licensing( parent_id );
+		clagess_licensing( table_element );
 	}
 }
 
@@ -1022,7 +1213,7 @@ class ClagessFormReports extends BaseFormReports
 
 	new ClagessFormRow(this, "CLAGESS", false, [  "innerHTML", "CLAGESS", "nextCell", "nop", "colspan", 3,
 			"innerHTML", "<b>Cl</b>aiming <b>Ag</b>e <b>E</b>stimator for <b>S</b>ocial <b>S</b>ecurity retirement benefits " +
-			"&nbsp;<small>version 0.22</small>",
+			"&nbsp;<small>version 0.23</small>",
 	], 0);
 
 		// DVO HELP - need to tweak the following to read the reports somehow from the BaseReport objects
@@ -1043,6 +1234,13 @@ class ClagessFormReports extends BaseFormReports
 
 		"element3", "option", "innerHTML", "Actuarial Table - at 62nd birthday", "value", "ActuarialTable_2020",
 		"title", ActuaryTable_description,
+
+		"element3", "option", "innerHTML", "Best Claiming-Age for Target-Age", "value", "Reverse",
+		"title", Reverse_description,
+
+		"element3", "option", "innerHTML", "At Age", "value", "At Age",
+		"title", AtAge_description,
+
 
 		"element3", "option", "innerHTML", "Licensing and Copyright notices", "value", "Licensing",
 		"title", Licensing_description,
@@ -1157,7 +1355,7 @@ class ClagessFormReports extends BaseFormReports
 	let claiming_ages_row = new ClagessFormRow(this, "Claiming-Ages", true, [ "innerHTML", "Claiming-Ages", "trclassadd", "clagess_table_row_claimingages",
 		"nextCell", "nop",
 		"element2", "input", "form_id", "", "type", "text", /*"id", "form1_claiming_id",*/ "value", "62 67 70",
-		"onchange", () => { this.onchange_claiming_ages(); },
+		"onchange", () => { this.onchange_claiming_ages("Claiming-Ages"); },
 		"onchange", () => { claiming_ages_row.on_arg_change(claiming_ages_row.form_id); },
 		"nextCell", "nop", "nextCell", "nop", "class", "description",
 		"innerHTML", "A list of claiming-ages - in year:month format - for which to include in table. 64:5 means 5 months after 64th birthday. " +
@@ -1199,6 +1397,21 @@ class ClagessFormReports extends BaseFormReports
 			}
 	);
 
+
+	let target_ages_row = new ClagessFormRow(this, "Target-Ages", true, [ "innerHTML", "Target-Ages", "trclassadd", "clagess_table_row_targetages",
+		"nextCell", "nop",
+		"element2", "input", "form_id", "", "type", "text", "value", "65 70 75 80 85 90 95 100",
+		"onchange", () => { this.onchange_claiming_ages("Target-Ages"); },
+		"onchange", () => { target_ages_row.on_arg_change(target_ages_row.form_id); },
+		"nextCell", "nop", "nextCell", "nop", "class", "description",
+		"innerHTML", "A list of target-ages - in year:month format - for which to include in table. 64:5 means 5 months after 64th birthday. " +
+				"67 is the same as 67:0. Note: a <i>start stop increment</i> format is also supported - here's an example of this special case: <b>62 64 :6</b> means 62 62:6 63 63:6 64.",
+		"title", ""
+	], 0,
+		(value) => { /* DVO HELP todo - add checking here */
+				return null;
+			}
+	);
 
 	new ClagessFormRow(this, "Arrears", true, [ "innerHTML", "Arrears", "trclassadd", "clagess_table_arrears",
 		"nextCell", "nop",
@@ -1323,6 +1536,37 @@ class ClagessFormReports extends BaseFormReports
 	], 8,
 	);
 
+	new ClagessFormRow(this, "Line Colors", true, [ "innerHTML", "Line Colors", "trclassadd", "clagess_table_row_line_colors",
+		"nextCell", "nop",
+		"element2", "input", "type", "text", "value", "", "form_id", "",
+		"nextCell", "nop", "nextCell", "nop", "class", "description",
+		"innerHTML", "<b>Optional</b>: A list of colors to recommend to Chart.js to use for each line that gets plotted. " + 
+				"Leave blank of auto-selection. Can use color names (e.g. red yellow), or RGB values (e.g. rgb(240,40,120). " +
+				"Separate by spaces, no commas.",
+	      	"title", ""
+	], 8,
+	);
+
+	new ClagessFormRow(this, "Y Scale Min", true, [ "innerHTML", "Y Scale Min", "trclassadd", "clagess_table_row_y_scale_min",
+		"nextCell", "nop",
+		"element2", "input", "type", "text", "value", "", "form_id", "",
+		"nextCell", "nop", "nextCell", "nop", "class", "description",
+		"innerHTML", "<b>Optional</b>: A hint to Chart.js as to the minimum value for the Y axis. " +
+				"Leave blank for auto-scaling which is usually preferred.",
+	      	"title", ""
+	], 8,
+	);
+
+	new ClagessFormRow(this, "Y Scale Max", true, [ "innerHTML", "Y Scale Max", "trclassadd", "clagess_table_row_y_scale_max",
+		"nextCell", "nop",
+		"element2", "input", "type", "text", "value", "", "form_id", "",
+		"nextCell", "nop", "nextCell", "nop", "class", "description",
+		"innerHTML", "<b>Optional</b>: A hint to Chart.js as to the maximum value for the Y axis. " +
+				"Leave blank for auto-scaling which is usually preferred.",
+	      	"title", ""
+	], 8,
+	);
+
 
 	new ClagessFormRow(this, "Buttons", false, [ "element", "button", "type", "submit", "innerHTML", "Create Report",
 		"form_id", "", "click", () => { this.on_action(parent_id); },
@@ -1365,9 +1609,9 @@ class ClagessFormReports extends BaseFormReports
 		}
 	}
 
-	onchange_claiming_ages()
+	onchange_claiming_ages(element_name)
 	{
-		let claiming_ages = this.get_element("Claiming-Ages");
+		let claiming_ages = this.get_element(element_name);
 		let  claiming_age_values = claiming_ages_string_to_values( claiming_ages.value );
 
 		if ((claiming_age_values.length == 3) && (claiming_age_values[0] < claiming_age_values[1]) &&  (claiming_age_values[2] < claiming_age_values[1]) ) {
@@ -1383,7 +1627,6 @@ class ClagessFormReports extends BaseFormReports
 				new_string2 += clagess_to_years_months( the_value, 3 )    + " ";
 			}
 			claiming_ages.value = new_string2;
-			// console.log("    new string=", claiming_ages.value );
 		}
 	}
 
@@ -1444,7 +1687,8 @@ function clagess_generate_payment_table( table_element, canvas_element, title, b
 	cell.outerHTML = "<th>Claiming Age (years:months)</th>";
 
 	cell = hrow1.insertCell();
-	cell.outerHTML = "<th>Claiming Date</th>";
+	cell.outerHTML = "<th>Claiming Month</th>";
+	cell.title = "Month of the first Social Security Retirement Benefit is paid (note benefits are normally received one month in arrears).";
 
 	cell = hrow1.insertCell();
 	cell.outerHTML = "<th>Early, Normal or Late Retirement - per SSA</th>";
@@ -1537,20 +1781,21 @@ function clagess_generate_payment_table( table_element, canvas_element, title, b
 
 	let datasets = []; // for plotting - list of datasets where each dataset represents a single plot-line for each claiming-age -
 				// containing the actual (Y values) data in an array named data.
-	datasets.push( { label: "Monthly retirement benefit", fill: false, borderWidth: 0.5, borderDash: [5, 8], data: dollar_amount  } );
+	datasets.push( { label: "Monthly retirement benefit", fill: false, borderWidth: 1, data: dollar_amount  } );
 
 	if (canvas_element !== null) { // plot
 		//let ctx = document.createElement("canvas");
 		//ctx.id = "myChart";
 		////my_parent.appendChild(ctx);
 		my_config = {
-			type: "line",
+//			type: "line",
+			type: "bar",
 			data: { labels: labels, datasets: datasets },
 			options: {
 				plugins: {
 					title: {
 						display: true,
-						text: "Claiming-Age's affect on monthly Social Security Retirement Benefits"
+						text: "Claiming-Age's effect on monthly Social Security Retirement Benefits"
 					},
 					subtitle: {
 						display: true,
@@ -1598,7 +1843,11 @@ function clagess_generate_payment_table( table_element, canvas_element, title, b
 								currency:"USD",
 								maximumFractionDigits:0
 							}).format(value)
-						}
+						},
+						title: { display: true, text: ["Monthly Social Security Retirement benefit"] }
+					},
+					x: {
+						title: { display: true, text: ["Claiming-Age", "Calendar Date, Age (Year:Months)", "(when started collecting SS retirement benefits)"] }
 					}
 				},
 				//animation: my_animation,
@@ -1617,19 +1866,22 @@ function clagess_generate_payment_table( table_element, canvas_element, title, b
 }
 
 
-function clagess_generate_table_bank_balance( the_table, the_canvas, title, birth_year, birth_month_user=1,
+function clagess_generate_table_bank_balance_V1( the_table, the_canvas,
+	title, birth_year, birth_month_user=1,
 	claiming_age_array, max_age, interest_percent_array=[0],
 	cola_percent=0, pia=1000, arrears=0, messages_id=null,
 	paydownbalance=0, borrow_irate=0, spendit=0,
 	tfdy=0, tfdr_percent=0,
-	animation_speed=0, max_animation_skew_ms = 3000)
+	animation_speed=0, max_animation_skew_ms = 3000,
+	line_colors=undefined,
+	y_scale_min=undefined, y_scale_max=undefined)
 // birth_month_user should be 1..12
 // claiming_age_array - array of values indicating year (and perhaps fractional month) - so 64+5/12 (=64.4166) means at age 64 years and 5 months.
 // arrears: SSA pays benefits about 1 month in arrears (i.e. February benefits are paid in March, etc.). Arrears=0 means to calculate and show
 // 	based on when benefits are earned (i.e. not in arrears). arrears=1 means to calculate and show based on when benefits are received
 // 	(i.e. in arrears).
 {
-	if (0) {console.log("Enter clagess_generate_table_bank_balance(the_table=", the_table, ", the_canvas=", the_canvas,
+	if (0) {console.log("Enter clagess_generate_table_bank_balance_V1(the_table=", the_table, ", the_canvas=", the_canvas,
 		", title=", title,
 		", birth_year=", birth_year, ", birth_month_user=", birth_month_user, ", claiming_age_array=", claiming_age_array,
 		", max_age=", max_age, ", interest_percent_array=", interest_percent_array, ", cola_percent=", cola_percent,  ", pia=", pia,
@@ -1637,22 +1889,13 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 		", paydownbalance=", paydownbalance, ", borrow_irate=", borrow_irate,
 		", spendit=", spendit,
 		", tfdy=", tfdy, ", tfdr=", tfdr_percent,
-		", animation_speed=", animation_speed, ", max_animation_skew_ms=", max_animation_skew_ms, ")" );
+		", animation_speed=", animation_speed, ", max_animation_skew_ms=", max_animation_skew_ms,
+		", line_colors=", line_colors,
+		", y_scale_min=", y_scale_min, ", y_scale_max=", y_scale_max, ")" );
 	}
-	//let my_parent = document.getElementById(parent_id);
-	//if (my_parent == null) { console.log("ERROR: no element found with id=", parent_id); return null; }
-
-	let alert_counter = 0; // To avoid seemingly endless error messages in some situations.
-
-	//let claiming_age_array_cleaned = claiming_ages_string_to_values( claiming_age_array );
-	let claiming_age_array_cleaned = claiming_age_array;
 
 	if (true) { // argument checking
 		let error_count = 0;
-//		if (!isNumber(append0_or_replace1) ||  (append0_or_replace1 < 0) || (append0_or_replace1 > 1)) {
-//			ErrorMessage(messages_id, "ERROR: append0_or_replace1="+ append0_or_replace1+ ", expecting value of either 0 or 1.");
-//			error_count++;
-//		}
 		if (!isNumber(birth_year) || (birth_year < 1900) || (birth_year > 2050)) {
 			ErrorMessage(messages_id, "ERROR: birth_year="+ birth_year+ ", expecting value of between 1900 and 2050.");
 			error_count++;
@@ -1661,7 +1904,7 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 			ErrorMessage(messages_id, "ERROR: birth_month_user="+birth_month_user+ ", expecting value of between 1 and 12.");
 			error_count++;
 		}
-		if (claiming_age_array_cleaned.length < 1) {
+		if (claiming_age_array.length < 1) {
 			ErrorMessage(messages_id, "ERROR: claiming_are_array's length="+ claiming_array_array.length+ ", expecting length of at least 1");
 			error_count++;
 		}
@@ -1721,31 +1964,13 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 	}
 
 
-	if (0) {
-	let table = null;
-	if (append0_or_replace1) { // replace
-		table_list = my_parent.querySelectorAll("table");
-		table = table_list[ table_list.length-1];
-		while (table.hasChildNodes()) { // clear out the existing table
-			table.removeChild(table.lastChild);
-		}
-		table.classList.add("replaced");
-	} else {
-		table = document.createElement("table");
-		table.id = "appended";
-		table.classList.add("appended");
-	}
-	table.id = "clagess_bank_balance_table";
-	table.classList.add("generated");
-	}
-
 
 	let benefit = []; // index by column combination of claiming age and interest-rate
 	let balance = []; // same index as in benefit[]
 
 
 	clagess_set_birth_year( birth_year );
-	for (claiming_age of claiming_age_array_cleaned) {
+	for (claiming_age of claiming_age_array) {
 		for (irate of interest_percent_array) {
 			let months_after_62 = Math.round( (claiming_age - 62) * 12 );
 			benefit.push( clagess_monthly_benefit[months_after_62] );
@@ -1753,14 +1978,20 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 		}
 	}
 
+	let num_data_columns = claiming_age_array.length * 3;
+	let num_irates = interest_percent_array.length;
+
+	let cell = null;
+	let col_label = [];
+	let col_claiming_age = null;
+	//
 	//////////////////////////////////
 	// Create table-header first
 	let thead = the_table.createTHead();
 	let hrow1 = thead.insertRow();
 
-	//////////////////////////
 	// The header is 3 rows
-	let cell = hrow1.insertCell(); // column 1
+	cell = hrow1.insertCell(); // column 1
 	cell.outerHTML = "<th rowspan=\"3\"></th>";
 
 	if (arrears == 0) { // payment not in arrears - i.e. with payement and due dates the same.
@@ -1798,7 +2029,7 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 	if (spendit != 0) {
 		let th = document.createElement("th");
 		th.innerHTML = "Spending ($)";
-		th.title = "Monthly deduction from the Bank Balance" + ((claiming_age_array_cleaned.length > 1) ? "(s)" : "") +
+		th.title = "Monthly deduction from the Bank Balance" + ((claiming_age_array.length > 1) ? "(s)" : "") +
 			" of $" + spendit +
 			". If Bank Balance is negative, then interest is charged at an annual rate of " + borrow_irate + "%.";
 		th.rowSpan = 3
@@ -1806,8 +2037,6 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 	}
 
 
-	let num_data_columns = claiming_age_array_cleaned.length * 3;
-	let num_irates = interest_percent_array.length;
 	th = document.createElement("th");
 	th.colSpan = num_data_columns * num_irates;
 	th.innerHTML = "Claiming-Age (year:month) Benefit Calculations";
@@ -1815,7 +2044,7 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 	hrow1.appendChild(th);
 
 
-	if (claiming_age_array_cleaned.length > 1) {
+	if (claiming_age_array.length > 1) {
 		let th = document.createElement("th");
 		th.innerHTML = "Best Claiming-Age";
 		th.title = "For each row, identifies the Claiming-Age with highest Bank Balance.";
@@ -1827,9 +2056,8 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 	// Header Row 2
 	let hrow2 = thead.insertRow();
 	let odd_column_group = false;
-	let col_label = [];
-	let col_claiming_age = [];
-	for (claiming_age of claiming_age_array_cleaned) {
+	col_claiming_age = [];
+	for (claiming_age of claiming_age_array) {
 		for (irate of interest_percent_array) {
 			odd_column_group = ! odd_column_group;
 			let th = document.createElement("th");
@@ -1848,7 +2076,7 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 	let hrow3 = thead.insertRow();
 
 	odd_column_group = false;
-	for (claiming_age of claiming_age_array_cleaned) {
+	for (claiming_age of claiming_age_array) {
 		for (irate of interest_percent_array) {
 			odd_column_group = ! odd_column_group;
 			let th = document.createElement("th");
@@ -1869,7 +2097,7 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 
 			th = document.createElement("th");
 			th.innerHTML = "Bank Balance ($)";
-			th.title = "Theoritical bank account balance given indicated history of Social Security check deposts and at indicated interest rates and COLA";
+			th.title = "Theoretical bank account balance given indicated history of Social Security check deposts and at indicated interest rates and COLA";
 			th.classList.add(odd_column_group ? "odd_column_group" : "even_column_group");
 			hrow3.appendChild(th);
 		}
@@ -1882,7 +2110,6 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 				// containing the actual (Y values) data in an array named data.
 	let labels = []; // for plotting - X axis labels
 
-
 	let num_months = (max_age - 62) * 12 + arrears;
 	let starting_months_after_62 = (paydownbalance > 0) ? -1 : 0;
 
@@ -1893,14 +2120,16 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 	let tbody = the_table.createTBody();
 	let row_index = 0;
 	for (let months_after_62 = starting_months_after_62; months_after_62 <= num_months; months_after_62++) { // each row
-		let body_row = tbody.insertRow(-1);
+
+		labels.push( format_date(birth_year+62, birth_month_user-1+months_after_62 ) +  ", " + clagess_to_years_months(62+months_after_62/12, 2) );
+
+		let body_row =  tbody.insertRow(-1);
 		let header_cell = body_row.insertCell();
 		header_cell.outerHTML = "<th>"+(months_after_62+1)+"</th>";
 
 		header_cell = body_row.insertCell();
 		header_cell.outerHTML = "<th>"+format_date(birth_year+62, birth_month_user-1+months_after_62)+"</th>";
 		
-		labels.push( format_date(birth_year+62, birth_month_user-1+months_after_62 ) +  " " + clagess_to_years_months(62+months_after_62/12, 2) );
 
 		if (arrears) {
 			header_cell = body_row.insertCell();
@@ -1911,7 +2140,6 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 		//header_cell.outerHTML = "<th>"+ String(Math.floor(62 + (birth_month_user-1+months_after_62)/12)) + ":"+ months_after_62%12 + "</th>";
 		header_cell.outerHTML = "<th>"+ clagess_to_years_months( 62 + months_after_62/12, 2) + "</th>";
 
-		if ( ((birth_month_user-1+months_after_62)%12) == 11) { cola_factor *= 1+cola_percent/100; } // COLA increase is in Dec benefit (typically paid in Jan)
 
 		if (cola_percent != 0.0) {
 			header_cell = body_row.insertCell();
@@ -1919,14 +2147,13 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 			header_cell.outerHTML = "<th>" + ((months_after_62 >= 0) ? parseFloat(cola_factor).toFixed(3) : "") + "</th>";
 		}
 
+		if ( ((birth_month_user-1+months_after_62)%12) == 11) { cola_factor *= 1+cola_percent/100; } // COLA increase is in Dec benefit (typically paid in Jan)
 
 		if ( (tfdy != "") && (tfdr_percent != 0) ) {
 			let this_year = birth_year+62 + (birth_month_user-1+months_after_62+1)/12;
 			if (this_year >= tfdy) {
 				tf_factor = (100 - tfdr_percent) / 100;
 			}
-			console.log("months_after_62=", months_after_62, ", this_year=", this_year, ", tfdy=", tfdy, ", tf_factor=", tf_factor );
-
 			header_cell = body_row.insertCell();
 			header_cell.outerHTML = "<th>" + parseFloat(tf_factor).toFixed(2) + "</th>";
 		}
@@ -1936,37 +2163,49 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 			spendit_cell.outerHTML = "<th>" + spendit + "</th>";
 		}
 
+		console.log("line_colors=", line_colors, ", length=", line_colors.length );
+		let line_colors_cleaned = undefined;
+		if ((line_colors != undefined ) && (line_colors.length > 0)) { line_colors_cleaned = line_colors.split(" "); }
+		console.log("line_colors_cleaned=", line_colors_cleaned );
+
 		let best_balance = 0;
 		let best_balance_col_index = 0;
 		odd_column_group = false;
 		let col_index = 0;
-		for (claiming_age of claiming_age_array_cleaned) { // column groups
+		for (claiming_age of claiming_age_array) { // column groups
 			for (irate of interest_percent_array) {
 				let interest_per_month = (irate/100) / 12;
 				if (row_index == 0) {
+					let this_line_color = undefined;
+					if (line_colors_cleaned != undefined) {
+						let array_length = line_colors_cleaned.length;
+						if (array_length >= 1) {
+							let this_index = col_index % array_length;
+							this_line_color = line_colors_cleaned[ this_index ];
+							console.log("col_index=", col_index, ", row_index=", row_index, ", this_index=", this_index, ", this_line_color=", this_line_color );
+						}
+					}
 					datasets.push( { label: clagess_to_years_months( claiming_age, 3 ) + ((num_irates > 1) ? " @ " + String(irate) + "%" : ""),
 							fill: false,
-//						stepped: true,
-//						borderWidth: 0.1,
-//						borderDash: [5, 5],
-//						borderDashOffset: 0,
+							borderColor: clagess_list_to_value( line_colors, col_index ),
 							data: []
 							} );
 				}
 
 				odd_column_group = ! odd_column_group;
 				let this_interest = (balance[col_index] >= 0) ?  (balance[col_index] * interest_per_month) : (balance[col_index] * borrow_irate/100 / 12)
-				let cell = body_row.insertCell();
-				cell.classList.add(odd_column_group ? "odd_column_group" : "even_column_group");
+				let innercell = body_row.insertCell();
+				innercell.classList.add(odd_column_group ? "odd_column_group" : "even_column_group");
 				if (months_after_62 >= 0) {
-					cell.innerHTML = parseFloat( this_interest ).toFixed(2);
-					if (put_negative_values_in_parenthesis && (this_interest < 0) ) { cell.innerHTML = "(" + cell.innerHTML + ")"; }
-					if (this_interest < 0) { cell.classList.add( "negative_dollars" ); }
-					if (this_interest ==  0) { cell.classList.add("zero_dollars"); }
+					innercell.innerHTML = parseFloat( this_interest ).toFixed(2);
+					if (put_negative_values_in_parenthesis && (this_interest < 0) ) { innercell.innerHTML = "(" + innercell.innerHTML + ")"; }
+					if (this_interest < 0) { innercell.classList.add( "negative_dollars" ); }
+					if (this_interest ==  0) { innercell.classList.add("zero_dollars"); }
 				}
 
 				cell = body_row.insertCell();
 				cell.classList.add(odd_column_group ? "odd_column_group" : "even_column_group");
+
 				let new_balance = balance[col_index];
 				if ((months_after_62 >= 0) && (months_after_62 < num_months)) {
 					let benefit_obj = benefit[col_index];
@@ -2000,9 +2239,9 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 				datasets[col_index].data.push( parseFloat(balance[col_index]).toFixed(2) );
 				col_index++;
 			} // for irate
-		} // for ii < claiming_age_array_cleaned.length - column groups
+		} // for ii < claiming_age_array.length - column groups
 
-		if (claiming_age_array_cleaned.length > 1) {
+		if (claiming_age_array.length > 1) {
 			cell = body_row.insertCell();
 			cell.innerHTML = col_label[ best_balance_col_index ];
 			cell.style.backgroundColor = clagess_color_interpolate( (col_claiming_age[ best_balance_col_index ] -62) * 12 / 96 );
@@ -2011,11 +2250,12 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 	} // for months_after_62
 
 
+	let interest_rate_string = (num_irates == 1) ? (interest_percent_array[0] + "%") : ("various interest rates (" + Math.min(...interest_percent_array) + "% .. " + Math.max(...interest_percent_array) + "%)");
 	// Row for notes...
 	let notes_row = tbody.insertRow(-1);
 	let notes_cell = notes_row.insertCell();
 	notes_cell.classList.add( "notes" );
-	let number_of_columns = 4 + claiming_age_array_cleaned.length * num_irates * 3 + ((claiming_age_array_cleaned.length > 1) ? 1 : 0);
+	let number_of_columns = 4 + claiming_age_array.length * num_irates * 3 + ((claiming_age_array.length > 1) ? 1 : 0);
 	notes_cell.setAttribute("colspan", number_of_columns);
 	let the_HTML = "<b>Notes</b>:<ol>";
 	the_HTML += "<li>The Social Security Administration pays benefits the month after (e.g. the June benefit is paid in July).";
@@ -2030,7 +2270,6 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 
 
 
-	let interest_rate_string = (num_irates == 1) ? (interest_percent_array[0] + "%") : ("various interest rates (" + Math.min(...interest_percent_array) + "% .. " + Math.max(...interest_percent_array) + "%)");
 	//if (append0_or_replace1 == 0) { my_parent.appendChild(table); }
 	table_caption = the_table.createCaption();
 	table_caption.innerHTML = title + ( (title!=='') ? '<br>' : "") +
@@ -2081,6 +2320,15 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 		if (title !== '') {
 			title_string_array.splice(0, 0, title );
 		}
+
+		let common_subtitle = "Born: " + String(months_user[birth_month_user]) + " " + String(birth_year) +
+						", Investment Interest Rate: " + interest_rate_string + ", COLA: "+ String(cola_percent) + "%, PIA: $" + String(pia) +
+						(spendit ? (", spending $" + spendit + " per month") : "") +
+						(paydownbalance ? (", initial loan balance of $" + paydownbalance) : "") +
+						(borrow_irate ? (", paying interest at " + borrow_irate +"% annually on negative balances") : "")
+
+		let subtitle_string_array = [common_subtitle];
+
 		my_config = {
 			type: "line",
 			data: { labels: labels, datasets: datasets },
@@ -2092,11 +2340,7 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 					},
 					subtitle: {
 						display: true,
-						text: "Born: " + String(months_user[birth_month_user]) + " " + String(birth_year) +
-							", Investment Interest Rate: " + interest_rate_string + ", COLA: "+ String(cola_percent) + "%, PIA: $" + String(pia) +
-							(spendit ? (", spending $" + spendit + " per month") : "") +
-							(paydownbalance ? (", initial loan balance of $" + paydownbalance) : "") +
-							(borrow_irate ? (", paying interest at " + borrow_irate +"% annually on negative balances") : "")
+						text: subtitle_string_array
 					},
 					tooltip: {
 						callbacks: {
@@ -2107,7 +2351,7 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 										maximumFractionDigits:0,
 										currency:"USD"
 									}).format(context.parsed.y);
-									return "Claiming age=" + context.dataset.label + ", Future Value=" + dollars;
+									return "Claiming age=" + context.dataset.label + ", Bank Balance=" + dollars;
 								}
 								return undefined;
 							}
@@ -2116,12 +2360,16 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 				},
 				scales : {
 					y: {
+						title: { display: true, text: "Bank Balance"
+						},
 						ticks: {
-							callback: value => new Intl.NumberFormat("en-US", {style:"currency",
-								currency:"USD",
-								maximumFractionDigits:0
-							}).format(value)
-						}
+							callback: value => new Intl.NumberFormat("en-US", {style:"currency", currency:"USD", maximumFractionDigits:0 }).format(value)
+						},
+						min: y_scale_min,
+						max: y_scale_max
+					},
+					x: {
+						title: { display: true, text: "Calendar Date, Age (Year:Months)" }
 					}
 				},
 				animation: my_animation,
@@ -2134,6 +2382,675 @@ function clagess_generate_table_bank_balance( the_table, the_canvas, title, birt
 			}
 		}
 
+		console.log("the_canvas=", the_canvas );
+		console.log("my_config=", my_config );
+		my_chart = new Chart(the_canvas.getContext("2d"), my_config );
+	}
+
+	return the_table;
+}
+
+
+function clagess_generate_table_bank_balance_V2( the_table, the_canvas,
+	title, birth_year, birth_month_user=1,
+	interest_percent,
+	cola_percent=0, pia=1000, messages_id=null,
+	paydownbalance=0, borrow_irate=0, spendit=0,
+	tfdy=0, tfdr_percent=0,
+	animation_speed=0, max_animation_skew_ms = 3000,
+	target_ages,
+	line_colors=undefined,
+	y_scale_min=undefined, y_scale_max=undefined)
+// birth_month_user should be 1..12
+// claiming_age_array - array of values indicating year (and perhaps fractional month) - so 64+5/12 (=64.4166) means at age 64 years and 5 months.
+// arrears: SSA pays benefits about 1 month in arrears (i.e. February benefits are paid in March, etc.). Arrears=0 means to calculate and show
+// 	based on when benefits are earned (i.e. not in arrears). arrears=1 means to calculate and show based on when benefits are received
+// 	(i.e. in arrears).
+{
+	if (0) {console.log("Enter clagess_generate_table_bank_balance_V2(the_table=", the_table, ", the_canvas=", the_canvas,
+		", title=", title,
+		", birth_year=", birth_year, ", birth_month_user=", birth_month_user,
+		", interest_percent=", interest_percent, ", cola_percent=", cola_percent,  ", pia=", pia,
+		", messages_id=", messages_id,
+		", paydownbalance=", paydownbalance, ", borrow_irate=", borrow_irate,
+		", spendit=", spendit,
+		", tfdy=", tfdy, ", tfdr=", tfdr_percent,
+		", animation_speed=", animation_speed, ", max_animation_skew_ms=", max_animation_skew_ms,
+		", target_ages=", target_ages,
+		", line_colors=", line_colors,
+		", y_scale_min=", y_scale_min, ", y_scale_max=", y_scale_max,
+		")" );
+	}
+
+	if (true) { // argument checking
+		let error_count = 0;
+		if (!isNumber(birth_year) || (birth_year < 1900) || (birth_year > 2050)) {
+			ErrorMessage(messages_id, "ERROR: birth_year="+ birth_year+ ", expecting value of between 1900 and 2050.");
+			error_count++;
+		}
+		if (!isNumber(birth_month_user) || (birth_month_user < 1) || (birth_month_user > 120)) {
+			ErrorMessage(messages_id, "ERROR: birth_month_user="+birth_month_user+ ", expecting value of between 1 and 12.");
+			error_count++;
+		}
+		if (!isNumber(interest_percent) || (interest_percent < -100) || (interest_percent > 1000) ) {
+			ErrorMessage(messages_id, "ERROR: interest_percent="+ interest_percent+ "%, seems out of range of reasonable values.");
+			error_count++;
+		}
+		if (!isNumber(cola_percent) || (cola_percent < -100) || (cola_percent > 1000) ) {
+			ErrorMessage(messages_id, "ERROR: cola_percent="+ cola_percent+ "%, seems out of range of reasonable values.");
+			error_count++;
+		}
+		if (!isNumber(pia) || (pia < 0) || (pia > 50000) ) {
+			ErrorMessage(messages_id, "ERROR: pia=$"+ pia+ ", seems out of range of reasonable values.");
+			error_count++;
+		}
+		if (paydownbalance === '') { paydownbalance = 0; }
+		if (!isNumber(paydownbalance) || (paydownbalance < 0) || (paydownbalance > 10000000) ) {
+			ErrorMessage(messages_id, "ERROR: paydownbalance=$"+ paydownbalance+ ", seems out of range of reasonable values.");
+			error_count++;
+		}
+		if (!isNumber(borrow_irate) || (borrow_irate < 0) || (borrow_irate > 25) ) {
+			ErrorMessage(messages_id, "ERROR: borrow_irate=%"+ borrow_irate+ ", seems out of range of reasonable values.");
+			error_count++;
+		}
+		if (!isNumber(spendit) || (spendit < 0) || (spendit > 10000) ) {
+			ErrorMessage(messages_id, "ERROR: spendit=$"+ spendit+ ", seems out of range of reasonable values.");
+			error_count++;
+		}
+
+		if (!isNumber(animation_speed) || (animation_speed < 0) || (animation_speed > 10000) ) {
+			ErrorMessage(messages_id, "ERROR: animation_speed="+ animation_speed+ ", seems out of range of reasonable values.");
+			error_count++;
+		}
+		if (!isNumber(max_animation_skew_ms) || (max_animation_skew_ms < 0) || (max_animation_skew_ms > 100000) ) {
+			ErrorMessage(messages_id, "ERROR: max_animation_skew="+ max_animation_skew_ms+ ", seems out of range of reasonable values.");
+			error_count++;
+		}
+
+		if (error_count > 0) {
+			return null;
+		}
+	}
+
+
+	clagess_set_birth_year( birth_year );
+
+	let claiming_age_array = [];
+	for (let year = 62; year <= 70; year++) {
+		for (let month=0; month<12; month++) {
+			claiming_age_array.push( year + month/12 );
+			if (year === 70) { break; }// Stop at 70 years and 0 months
+		}
+	}
+	let max_age = Math.max(...target_ages);
+	let num_months = (max_age - 62) * 12;
+
+	let data_cache = []; // data_cache[ A ].data[ B ] : A is months_after 62, B is index of claiming-age - contents is bank-balance in dollars
+	let initial_benefit = []; // indexed by months after 62 in claiming-age
+
+	let interest_per_month = (interest_percent/100) / 12;
+	let first_loop = true;
+	for (claiming_age of claiming_age_array) {
+		let claiming_age_months_after_62 = Math.round( (claiming_age - 62) * 12 );
+		let benefit = clagess_monthly_benefit[claiming_age_months_after_62];
+		initial_benefit.push( benefit.benefit );
+		let balance = -paydownbalance;
+
+		let accumulated_cola_percent = 0;
+		let cola_factor = 1;
+		let tf_factor = 1.0;
+		for (let months_after_62 = 0; months_after_62 <= num_months; months_after_62++) {
+			if (first_loop) { data_cache.push( { label: "Some label " + claiming_age + " " + months_after_62, fill: false, data: [] } ); }
+			if ( ((birth_month_user-1+months_after_62)%12) == 11) { cola_factor *= 1+cola_percent/100; } // COLA increase is in Dec benefit (typically paid in Jan)
+			if ( (tfdy != "") && (tfdr_percent != 0) ) {
+				let this_year = birth_year+62 + (birth_month_user-1+months_after_62+1)/12;
+				if (this_year >= tfdy) {
+					tf_factor = (100 - tfdr_percent) / 100;
+				}
+			}
+			let this_interest = (balance >= 0) ?  (balance * interest_per_month) : (balance * borrow_irate/100 / 12);
+			let this_benefit = (months_after_62 >= claiming_age_months_after_62) ? (benefit.benefit * pia * cola_factor * tf_factor) : 0;
+
+			balance += this_benefit + this_interest - spendit;
+			data_cache[months_after_62].data.push( balance );
+
+		} // for months_after_62
+		first_loop = false;
+	} // for claiming_age
+
+	let max_dollars_per_ta_index = [];
+	for (let ta_index=0; ta_index < target_ages.length; ta_index++) {
+		let target_age = target_ages[ta_index];
+		let ta_months_after_62 = Math.round( (target_age - 62) * 12 );
+		let max_dollars = 0;
+		for (let months_after_62 = 0; months_after_62 <= num_months; months_after_62++) {
+			if (data_cache[ta_months_after_62].data[months_after_62] > max_dollars) {
+				max_dollars = data_cache[ta_months_after_62].data[months_after_62];
+			}
+		}
+		max_dollars_per_ta_index.push( max_dollars );
+		console.log("ta_index=", ta_index, ", target_age=", target_age, ", max_dollars=", max_dollars );
+	}
+	console.log("max_dollars_per_ta_index=", max_dollars_per_ta_index);
+
+
+	// Now have the desired data in data_cache
+
+	// ///////////////////////////////////////////////////////////////////////////////////////////
+	// Generate the HTML table
+	// Create table-header first
+	let thead = the_table.createTHead();
+	let hrow1 = thead.insertRow();
+
+	// The header is 3 rows
+	let cell = hrow1.insertCell(); // column 1
+	cell.outerHTML = "<th rowspan=\"3\"></th>";
+
+	cell = hrow1.insertCell(); // column 2
+	cell.outerHTML = "<th rowspan=\"3\">Claiming-Age<br><small>(years:months)</small></th>";
+
+
+	cell = hrow1.insertCell(); // column 3
+	cell.outerHTML = "<th rowspan=\"3\">Claiming Date</th>";
+	cell.title = "Date of initial Social Security Retirement Benefit";
+
+	cell = hrow1.insertCell(); // column 3
+	cell.outerHTML = "<th rowspan=\"3\">Initial Benefit</th>";
+
+	cell = hrow1.insertCell(); // more columns after 3
+	cell.outerHTML = "<th colspan=\"" + target_ages.length + "\">Target Age <small>(years:months)</small></th>";
+
+
+	// Row 2
+	let hrow2 = thead.insertRow();
+	let odd_column_group = false;
+	for (target_age of target_ages) {
+		odd_column_group = ! odd_column_group;
+		let th = document.createElement("th");
+		th.innerHTML = clagess_to_years_months(target_age,2);
+		th.title = "Target-Age: " + clagess_to_years_months( target_age );
+		th.classList.add(odd_column_group ? "odd_column_group" : "even_column_group");
+		hrow2.appendChild(th);
+	}
+
+	// Row 3
+	let hrow3 = thead.insertRow();
+	odd_column_group = false;
+	for (target_age of target_ages) {
+		odd_column_group = ! odd_column_group;
+		let target_age_months_after_62 = Math.round( (target_age - 62) * 12 );
+		let th = document.createElement("th");
+		th.innerHTML = format_date(birth_year+62, birth_month_user-1+target_age_months_after_62);
+		th.title = "Target-Age: " + clagess_to_years_months( target_age );
+		th.classList.add(odd_column_group ? "odd_column_group" : "even_column_group");
+		hrow3.appendChild(th);
+	}
+
+
+	// Table body
+	let tbody = the_table.createTBody();
+
+
+	for (claiming_age of claiming_age_array) {
+		let claiming_age_months_after_62 = Math.round( (claiming_age - 62) * 12 );
+
+		let body_row =  tbody.insertRow(-1);
+		let data_cell = body_row.insertCell();
+		data_cell.outerHTML = "<th>"+(claiming_age_months_after_62+1)+"</th>";
+
+		data_cell = body_row.insertCell();
+		data_cell.outerHTML = "<th>"+clagess_to_years_months(claiming_age,2)+"</th>";
+
+		data_cell = body_row.insertCell();
+		data_cell.outerHTML = "<th>"+format_date(birth_year+62, birth_month_user-1+claiming_age_months_after_62)+"</th>";
+
+		data_cell = body_row.insertCell();
+		data_cell.outerHTML = "<td>" + parseFloat( pia * initial_benefit[claiming_age_months_after_62] ).toFixed(2) + "</td>";
+
+		odd_column_group = false;
+		let index = 0;
+		for (target_age of target_ages) {
+			odd_column_group = ! odd_column_group;
+			let target_age_months_after_62 = Math.round( (target_age - 62) * 12 );
+			let data_cell = body_row.insertCell();
+			data_cell.classList.add(odd_column_group ? "odd_column_group" : "even_column_group");
+			let dollars = data_cache[target_age_months_after_62].data[claiming_age_months_after_62];
+			//data_cell.outerHTML = "<td>"+ parseFloat( dollars ).toFixed(2) +"</td>";
+			data_cell.innerHTML = parseFloat( dollars ).toFixed(2);
+			if (put_negative_values_in_parenthesis && (dollars < 0) ) { data_cell.innerHTML = "(" + data_cell.innerHTML + ")"; }
+			if (dollars < 0) { data_cell.classList.add( "negative_dollars" ); }
+			if (dollars ==  0) { data_cell.classList.add("zero_dollars"); }
+
+			if (max_dollars_per_ta_index[index] == dollars) { data_cell.classList.add("best_month"); }
+			index++;
+		}
+	}
+
+
+	// Add the caption
+	let table_caption = the_table.createCaption();
+	table_caption.innerHTML = title + ( (title!=='') ? '<br>' : "") +
+				"This table shows the hypothetical bank account balances at the indicated Target Ages for each possible claiming age. " +
+				"Using an accumulating bank balance approach (aka Future Value) for evaluating Claiming-Age for Social Security benefits. " +
+				"Simulates depositing every monthly Social Security benefit payment into a bank account paying <b>"+
+				interest_percent+"%</b> annually. " +
+				"COLA is <b>" + cola_percent + "%</b>" +
+				((cola_percent == 0) ? "" : " increases benefit amount every December (for the January benefit payment)") +
+				". This table is for claimant born in <b>" + months_user[birth_month_user]+ " " + birth_year +
+				"</b> and with a lifetime earnings resulting in a PIA of <b>$"+pia+"</b> in <b>"+ String(birth_year + 62)+ "</b>.";
+	if (spendit > 0) {
+		table_caption.innerHTML += "<br>Claimant is spending $" + spendit + " every month. Negative Bank Balances (if any) pay interest of <b>" + borrow_irate + "%</b>.";
+	}
+	if (paydownbalance > 0) {
+		table_caption.innerHTML += "<br>Note: This starts with a loan pay-down situation - the initial loan balance is <b>$" + paydownbalance +
+				"</b> at an annual interest rate of <b>" + borrow_irate +
+				"%</b>. This interest rate is continued until the loan balance is paid off, at which time the annual " +
+				"interest rate changes to <b>" + interest_rate_string + "%</b>.";
+	}
+
+	if ( (tfdy != "") && (tfdr_percent != 0) ) {
+		table_caption.innerHTML += "<br>Note: This <i>models</i> the Social Security Old-Age and Survivors Insurance (OASI) trust fund in the year " + tfdy +
+				" at which time benefits will be reduced by " + tfdr_percent + "%.";
+	}
+
+
+
+
+	let datasets = [];
+	let labels = [];
+	for (let claiming_age_index = 0; claiming_age_index <= ((70-62)*12 + 1); claiming_age_index++) {
+		labels.push( format_date(birth_year+62, birth_month_user-1+claiming_age_index ) +  " " + clagess_to_years_months(62+claiming_age_index/12, 2) );
+	}
+	for (let ta_index=0; ta_index< target_ages.length; ta_index++) {
+		let target_age = target_ages[ta_index];
+		let target_age_months_after_62 = Math.round( (target_age - 62) * 12 );
+		let dollars_per_target_age = [];
+		datasets.push( { label: "Target age: " + target_age + " (" + format_date(birth_year+62, birth_month_user-1+target_age_months_after_62) + ")",
+			fill: false, borderWidth: 0.5, borderDash: [5, 8],
+			borderColor: clagess_list_to_value( line_colors, ta_index ),
+			data: [] } );
+		for (let jj=0; jj < ((70-62) * 12 + 1); jj++) {
+			datasets[ ta_index ].data.push( data_cache[target_age_months_after_62].data[jj] );
+		}
+	}
+
+
+	if (the_canvas !== null) { // plot
+		const delay_between_points = (animation_speed * 10) / (datasets[0].data.length+1); // +1 to avoid possible divide by 0
+		const delay_between_datasets = (animation_speed > 0) ? 4000 : 0;
+		my_animation = {
+			x: { // Attempt to draw one dataset at a time.
+				duration: 1000,
+				from: NaN,
+				delay(the_canvas) {
+					if (the_canvas.type !== 'data') { return 0; }
+						return the_canvas.datasetIndex * delay_between_datasets + the_canvas.index * delay_between_points;
+				},
+			}
+		}
+
+
+		let title_string_array = ["Accumulated Benefits at Target-Age versus Claiming-Age" + ((target_ages.length > 1) ? " across various target-dates" : "")];
+		if (title !== '') {
+			title_string_array.splice(0, 0, title );
+		}
+
+		let common_subtitle = "Born: " + String(months_user[birth_month_user]) + " " + String(birth_year) +
+						", Investment Interest Rate: " + interest_percent + "%, COLA: "+ String(cola_percent) + "%, PIA: $" + String(pia) +
+						(spendit ? (", spending $" + spendit + " per month") : "") +
+						(paydownbalance ? (", initial loan balance of $" + paydownbalance) : "") +
+						(borrow_irate ? (", paying interest at " + borrow_irate +"% annually on negative balances") : "")
+
+		let subtitle_string_array = [common_subtitle];
+
+		my_config = {
+//			type: "line",
+			type: "bar",
+			data: { labels: labels, datasets: datasets },
+			options: {
+				plugins: {
+					title: {
+						display: true,
+						text: title_string_array
+					},
+					subtitle: {
+						display: true,
+						text: subtitle_string_array
+					},
+					tooltip: {
+						callbacks: {
+							label: function(context) {
+								if (context.parsed.y !== null) {
+									let dollars = new Intl.NumberFormat("en-US", {
+										style:"currency",
+										maximumFractionDigits:0,
+										currency:"USD"
+									}).format(context.parsed.y);
+									return "Claiming age=" + clagess_to_years_months( 62 + context.parsed.x/12, 5) + ", Accumulated Value=" + dollars;
+								}
+								return undefined;
+							}
+						}
+					}
+				},
+				scales : {
+					y: {
+						title: { display: true, text: "Accumulated Benefits"
+						},
+						ticks: {
+							callback: value => new Intl.NumberFormat("en-US", {style:"currency", currency:"USD", maximumFractionDigits:0 }).format(value)
+						},
+						min: y_scale_min,
+						max: y_scale_max
+					},
+					x: {
+						title: { display: true, text: ["Claiming-Age", "Calendar Date, Age (Year:Months)", "(when started collecting SS retirement benefits)"] },
+						stacked: true
+					}
+				},
+				animation: my_animation,
+				onClick: (e) => {
+					if (my_chart != null) {
+						my_chart.destroy();
+						my_chart = new Chart( the_canvas.getContext("2d"), my_config );
+					}
+				}
+			}
+		}
+
+		console.log("the_canvas=", the_canvas );
+		console.log("my_config=", my_config );
+		my_chart = new Chart(the_canvas.getContext("2d"), my_config );
+	}
+
+	return the_table;
+} // clagess_generate_table_bank_balance_V2()
+
+
+function clagess_generate_table_bank_balance_V3( the_table, the_canvas,
+	title, birth_year, birth_month_user=1,
+	claiming_age_array, max_age, interest_percent_array=[0],
+	cola_percent=0, pia=1000, arrears=0, messages_id=null,
+	paydownbalance=0, borrow_irate=0, spendit=0,
+	tfdy=0, tfdr_percent=0,
+	animation_speed=0, max_animation_skew_ms = 3000,
+	line_colors=undefined,
+	y_scale_min=undefined, y_scale_max=undefined)
+// birth_month_user should be 1..12
+// claiming_age_array - array of values indicating year (and perhaps fractional month) - so 64+5/12 (=64.4166) means at age 64 years and 5 months.
+// arrears: SSA pays benefits about 1 month in arrears (i.e. February benefits are paid in March, etc.). Arrears=0 means to calculate and show
+// 	based on when benefits are earned (i.e. not in arrears). arrears=1 means to calculate and show based on when benefits are received
+// 	(i.e. in arrears).
+{
+	if (0) {console.log("Enter clagess_generate_table_bank_balance_V3(the_table=", the_table, ", the_canvas=", the_canvas,
+		", title=", title,
+		", birth_year=", birth_year, ", birth_month_user=", birth_month_user, ", claiming_age_array=", claiming_age_array,
+		", max_age=", max_age, ", interest_percent_array=", interest_percent_array, ", cola_percent=", cola_percent,  ", pia=", pia,
+		", arrears=", arrears, ", messages_id=", messages_id,
+		", paydownbalance=", paydownbalance, ", borrow_irate=", borrow_irate,
+		", spendit=", spendit,
+		", tfdy=", tfdy, ", tfdr=", tfdr_percent,
+		", animation_speed=", animation_speed, ", max_animation_skew_ms=", max_animation_skew_ms,
+		", line_colors=", line_colors,
+		", y_scale_min=", y_scale_min, " y_scale_max=", y_scale_max, ")" );
+	}
+
+	if (true) { // argument checking
+		let error_count = 0;
+		if (!isNumber(birth_year) || (birth_year < 1900) || (birth_year > 2050)) {
+			ErrorMessage(messages_id, "ERROR: birth_year="+ birth_year+ ", expecting value of between 1900 and 2050.");
+			error_count++;
+		}
+		if (!isNumber(birth_month_user) || (birth_month_user < 1) || (birth_month_user > 120)) {
+			ErrorMessage(messages_id, "ERROR: birth_month_user="+birth_month_user+ ", expecting value of between 1 and 12.");
+			error_count++;
+		}
+		if (claiming_age_array.length < 1) {
+			ErrorMessage(messages_id, "ERROR: claiming_are_array's length="+ claiming_array_array.length+ ", expecting length of at least 1");
+			error_count++;
+		}
+		if (!isNumber(max_age) || (max_age < 62) || (max_age > 200) ) {
+			ErrorMessage(messages_id, "ERROR: max_age="+ max_age+ ", expecting value >= 62 and < 150.");
+			error_count++;
+		}
+		for (irate of interest_percent_array) {
+			let irateV = Number(irate);
+			if (!isNumber(irateV) || (irateV < -100) || (irateV > 1000) ) {
+				ErrorMessage(messages_id, "ERROR: interest_percent="+ irateV+ "%, seems out of range of reasonable values.");
+				error_count++;
+				break;
+			}
+		}
+//		if (!isNumber(interest_percent) || (interest_percent < -100) || (interest_percent > 1000) ) {
+//			ErrorMessage(messages_id, "ERROR: interest_percent="+ interest_percent+ "%, seems out of range of reasonable values.");
+//			error_count++;
+//		}
+		if (!isNumber(cola_percent) || (cola_percent < -100) || (cola_percent > 1000) ) {
+			ErrorMessage(messages_id, "ERROR: cola_percent="+ cola_percent+ "%, seems out of range of reasonable values.");
+			error_count++;
+		}
+		if (!isNumber(pia) || (pia < 0) || (pia > 50000) ) {
+			ErrorMessage(messages_id, "ERROR: pia=$"+ pia+ ", seems out of range of reasonable values.");
+			error_count++;
+		}
+		if (!isNumber(arrears) || (arrears < 0) || (arrears > 1) ) {
+			ErrorMessage(messages_id, "ERROR: arrears="+ arrears+ ", expecting value of either 0 or 1.");
+			error_count++;
+		}
+		if (!isNumber(paydownbalance) || (paydownbalance < 0) || (paydownbalance > 10000000) ) {
+			ErrorMessage(messages_id, "ERROR: paydownbalance=$"+ paydownbalance+ ", seems out of range of reasonable values.");
+			error_count++;
+		}
+		if (!isNumber(borrow_irate) || (borrow_irate < 0) || (borrow_irate > 25) ) {
+			ErrorMessage(messages_id, "ERROR: borrow_irate=%"+ borrow_irate+ ", seems out of range of reasonable values.");
+			error_count++;
+		}
+		if (!isNumber(spendit) || (spendit < 0) || (spendit > 10000) ) {
+			ErrorMessage(messages_id, "ERROR: spendit=$"+ spendit+ ", seems out of range of reasonable values.");
+			error_count++;
+		}
+
+		if (!isNumber(animation_speed) || (animation_speed < 0) || (animation_speed > 10000) ) {
+			ErrorMessage(messages_id, "ERROR: animation_speed="+ animation_speed+ ", seems out of range of reasonable values.");
+			error_count++;
+		}
+		if (!isNumber(max_animation_skew_ms) || (max_animation_skew_ms < 0) || (max_animation_skew_ms > 100000) ) {
+			ErrorMessage(messages_id, "ERROR: max_animation_skew="+ max_animation_skew_ms+ ", seems out of range of reasonable values.");
+			error_count++;
+		}
+
+		if (error_count > 0) {
+			return null;
+		}
+	}
+
+
+
+	let benefit = []; // index by column combination of claiming age and interest-rate
+	let balance = []; // same index as in benefit[]
+
+
+	clagess_set_birth_year( birth_year );
+	for (claiming_age of claiming_age_array) {
+		for (irate of interest_percent_array) {
+			let months_after_62 = Math.round( (claiming_age - 62) * 12 );
+			benefit.push( clagess_monthly_benefit[months_after_62] );
+			balance.push( -paydownbalance );
+		}
+	}
+
+	let num_data_columns = claiming_age_array.length * 3;
+	let num_irates = interest_percent_array.length;
+
+	let cell = null;
+	let col_label = [];
+	let col_claiming_age = null;
+
+
+	///////////////////////////////////////////////////////
+	// create table-body
+	let datasets = []; // for plotting - list of datasets where each dataset represents a single plot-line for each claiming-age -
+				// containing the actual (Y values) data in an array named data.
+	let labels = []; // for plotting - X axis labels
+	let row_to_claiming_age = [];
+	let row_to_accumulated_benefits = [];
+
+	datasets.push( { label: "Best Claiming-Age", fill: false, borderColor: clagess_list_to_value( line_colors, 0) , data: [] } );
+
+	let num_months = (max_age - 62) * 12 + arrears;
+	let starting_months_after_62 = (paydownbalance > 0) ? -1 : 0;
+
+	let accumulated_cola_percent = 0;
+	let cola_factor = 1;
+
+	let tf_factor = 1.0;
+	let row_index = 0;
+	for (let months_after_62 = starting_months_after_62; months_after_62 <= num_months; months_after_62++) { // each row
+
+		labels.push( format_date(birth_year+62, birth_month_user-1+months_after_62 ) +  ", " + clagess_to_years_months(62+months_after_62/12, 2) );
+
+		let body_row = null;
+
+		if ( ((birth_month_user-1+months_after_62)%12) == 11) { cola_factor *= 1+cola_percent/100; } // COLA increase is in Dec benefit (typically paid in Jan)
+
+		if ( (tfdy != "") && (tfdr_percent != 0) ) {
+			let this_year = birth_year+62 + (birth_month_user-1+months_after_62+1)/12;
+			if (this_year >= tfdy) {
+				tf_factor = (100 - tfdr_percent) / 100;
+			}
+		}
+
+
+		let best_balance = 0;
+		let best_balance_col_index = 0;
+		odd_column_group = false;
+		let col_index = 0;
+		row_to_accumulated_benefits [ row_index ] = 0;
+		for (claiming_age of claiming_age_array) { // column groups
+			for (irate of interest_percent_array) {
+				let interest_per_month = (irate/100) / 12;
+				if (row_index == 0) {
+					row_to_claiming_age[ col_index ] = clagess_to_years_months( claiming_age, 5 );
+				}
+
+				odd_column_group = ! odd_column_group;
+				let this_interest = (balance[col_index] >= 0) ?  (balance[col_index] * interest_per_month) : (balance[col_index] * borrow_irate/100 / 12)
+
+				let new_balance = balance[col_index];
+				if ((months_after_62 >= 0) && (months_after_62 < num_months)) {
+					let benefit_obj = benefit[col_index];
+					let month_benefit_starts = (benefit_obj.age_year-62)*12 + benefit_obj.age_month;
+					let this_benefit = 0;
+					if ((months_after_62 >= (month_benefit_starts + arrears)) && (months_after_62 <= ((max_age-62)*12) ) ) {
+						//this_benefit = benefit_obj.benefit * pia * (1 + accumulated_cola_percent/100);
+						this_benefit = benefit_obj.benefit * pia * cola_factor * tf_factor;
+					}
+
+					new_balance += this_benefit + this_interest - spendit;
+				}
+
+				balance[col_index] = new_balance;
+
+				if (months_after_62 >= 0) {
+					if (new_balance > best_balance) {
+						best_balance = new_balance;
+						best_balance_col_index = col_index;
+					}
+				}
+
+				col_index++;
+			} // for irate
+		} // for ii < claiming_age_array.length - column groups
+
+		datasets[0].data.push( best_balance_col_index );
+		row_to_accumulated_benefits[ row_index ] = best_balance;
+		row_index++;
+	} // for months_after_62
+
+
+	let interest_rate_string = (num_irates == 1) ? (interest_percent_array[0] + "%") : ("various interest rates (" + Math.min(...interest_percent_array) + "% .. " + Math.max(...interest_percent_array) + "%)");
+
+	if (the_canvas !== null) { // plot
+		//let ctx = document.createElement("canvas");
+		//ctx.id = "myChart";
+		//my_parent.appendChild(ctx);
+
+
+		const delay_between_points = (animation_speed * 10) / (datasets[0].data.length+1); // +1 to avoid possible divide by 0
+		const delay_between_datasets = (animation_speed > 0) ? 4000 : 0;
+		my_animation = {
+			x: { // Attempt to draw one dataset at a time.
+				duration: 1000,
+				from: NaN,
+				delay(the_canvas) {
+					if (the_canvas.type !== 'data') { return 0; }
+						return the_canvas.datasetIndex * delay_between_datasets + the_canvas.index * delay_between_points;
+				},
+			}
+		}
+
+
+		let title_string_array = ["Best Claiming-Age for Target-Age", "For a given target-age, which claiming-age yields the best financial results?"];
+		if (title !== '') {
+			title_string_array.splice(0, 0, title );
+		}
+
+		let common_subtitle = "Born: " + String(months_user[birth_month_user]) + " " + String(birth_year) +
+						", Investment Interest Rate: " + interest_rate_string + ", COLA: "+ String(cola_percent) + "%, PIA: $" + String(pia) +
+						(spendit ? (", spending $" + spendit + " per month") : "") +
+						(paydownbalance ? (", initial loan balance of $" + paydownbalance) : "") +
+						(borrow_irate ? (", paying interest at " + borrow_irate +"% annually on negative balances") : "")
+
+		let subtitle_string_array = ["For given scenario, which claiming-age yields the best financial results.", common_subtitle];
+
+		my_config = {
+			type: "line",
+			data: { labels: labels, datasets: datasets },
+			options: {
+				plugins: {
+					title: {
+						display: true,
+						text: title_string_array
+					},
+					subtitle: {
+						display: true,
+						text: subtitle_string_array
+					},
+					tooltip: {
+						callbacks: {
+							label: function(context) { return "Best Claiming-Age: " + row_to_claiming_age[ context.parsed.y ] + " (Accumulated Benefits: " +
+											new Intl.NumberFormat("en-US",
+												{ style:"currency",maximumFractionDigits:0,currency:"USD" }
+												).format(row_to_accumulated_benefits[ context.parsed.x ]) + ")" ; }
+						}
+					}
+				},
+				scales : {
+					y: {
+						title: { display: true, text: "Best Claiming-Age"
+						},
+						ticks: {
+							callback: value => row_to_claiming_age[ value ]
+						},
+						min: y_scale_min,
+						max: y_scale_max
+					},
+					x: {
+						title: { display: true, text: ["Calendar Date, Age (Year:Months)", "Target-Age for which to optimized accumulated benefits."] }
+					}
+				},
+				animation: my_animation,
+				onClick: (e) => {
+					if (my_chart != null) {
+						my_chart.destroy();
+						my_chart = new Chart( the_canvas.getContext("2d"), my_config );
+					}
+				}
+			}
+		}
+
+		console.log("the_canvas=", the_canvas );
+		console.log("my_config=", my_config );
 		my_chart = new Chart(the_canvas.getContext("2d"), my_config );
 	}
 
@@ -2175,8 +3092,8 @@ function clagess_generate_actuarial_table(  table_element, canvas_element, title
 //	let ctx = document.createElement("canvas");
 //	ctx.id = "myChart";
 //	my_parent.appendChild(ctx);
-	datasets.push( { label: "Male", fill: false, borderWidth: 0.5, borderDash: [5, 8], data: survival_from_62_male } );
-	datasets.push( { label: "Female", fill: false, borderWidth: 0.5, borderDash: [5, 8], data: survival_from_62_female } );
+	datasets.push( { label: "Male", fill: false, borderWidth: 1, borderColor: "blue", data: survival_from_62_male } );
+	datasets.push( { label: "Female", fill: false, borderWidth: 1, borderColor: "pink", data: survival_from_62_female } );
 
 	if (1) { // plot
 //		let ctx = document.createElement("canvas");
@@ -2293,7 +3210,6 @@ function claiming_ages_string_to_values( claiming_age_string )
 	// Look for special cases - a space as first and/or last element
 	if (claiming_age_values[0] == ' ') { claiming_age_values.shift(); }
 	if (claiming_age_values[claiming_age_values.length-1] == ' ') { claiming_age_values.pop(); }
-
 	return claiming_age_values;
 }
 
@@ -2472,6 +3388,8 @@ function clagess_create_input_form( parent_id )
 	let report_2 = new Report_ClaimingAgeTable( the_form_reports );
 	let report_3 = new Report_OptimumRetirementClaimingAgeSummaryChart( the_form_reports );
 	let report_4 = new Report_ActuaryTable( the_form_reports );
+	let report_5 = new Report_Reverse( the_form_reports );
+	let report_6 = new Report_AtAge( the_form_reports );
 
 	let report_9 = new Report_Licensing( the_form_reports );
 
@@ -2484,23 +3402,13 @@ function clagess_create_input_form( parent_id )
 	return form1;
 }
 
-function clagess_licensing( parent_id )
+function clagess_licensing( table_element )
 {
-	let my_parent = document.getElementById(parent_id);
-	if (my_parent == null) { console.error("ERROR: no element found with id="+ parent_id+ " in clagess_licensing" ); return null; }
+	let tbody = table_element.createTBody();
+	let body_row = tbody.insertRow(-1);
+	let body_cell = body_row.insertCell();
 
-	let table_list = my_parent.querySelectorAll("table");
-	table = table_list[ table_list.length-1];
-	if ( typeof table !== "undefined" ) {
-		while (table.hasChildNodes()) {
-			table.removeChild(table.lastChild);
-		}
-	}
-
-	let my_div = document.createElement("div");
-	my_div.id = "mit_license";
-
-	my_div.innerHTML =
+	body_cell.innerHTML =
 		"<p>Copyright (c) 2023-2024 Don Organ" +
 		"<p>Copyright (c) 2014-2022 Chart.js Contributors" +
 
@@ -2510,6 +3418,5 @@ function clagess_licensing( parent_id )
 
 		"<p>THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.";
 
-	my_parent.appendChild(my_div);
 }
 

@@ -8,9 +8,12 @@
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js" integrity="sha512-ZwR1/gSZM3ai6vCdI+LVF1zSq/5HznD3ZSTk7kajkaj4D292NLuduDCO1c/NT8Id+jE58KYLKT7hXnbtryGmMg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/3.0.1/chartjs-plugin-annotation.min.js" integrity="sha512-Hn1w6YiiFw6p6S2lXv6yKeqTk0PLVzeCwWY9n32beuPjQ5HLcvz5l2QsP+KilEr1ws37rCTw3bZpvfvVIeTh0Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
-
+<!--
 		<script src="https://dovicor.github.io/clagess/ss_period_life_table_2020.js"></script>
 		<script src="https://dovicor.github.io/clagess/clagess.js"></script>
+		-->
+		<script src="./ss_period_life_table_2020.js"></script>
+		<script src="./clagess.js"></script>
 
 		<style>
 /* Defining the CSS styles in the HTML for simplicity - to avoid another file, although this is still a bit
@@ -104,7 +107,7 @@ table.clagess_bank_balance_table th { background-color: var(--color_scheme_A_K);
 table.clagess_bank_balance_table th.odd_column_group { background-color: var(--color_scheme_A_I); }
 table.clagess_bank_balance_table th.even_column_group{ background-color: var(--color_scheme_A_G); }
 table.clagess_bank_balance_table td {
-				background-color: #red; /* Matches Nothing? */
+				background-color: red; /* Matches Nothing? */
 				text-align: center;
 }
 table.clagess_bank_balance_table td.odd_column_group { background-color: var(--color_scheme_A_D); }
@@ -132,10 +135,41 @@ table.clagess_payment_table .notes {
 				text-align: left;
 }
 
-table.clagess_bank_balance_table thead { /* Fixed header, but the body scrolls vertically */
+
+table.clagess_at_age_table { background-color: var(--color_scheme_C_D); } /* Basically just the grid lines */
+table.clagess_at_age_table th { background-color: var(--color_scheme_A_I); }
+
+table.clagess_at_age_table th.odd_column_group { background-color: var(--color_scheme_C_D); }
+table.clagess_at_age_table th.even_column_group{ background-color: var(--color_scheme_C_C); }
+table.clagess_at_age_table td {
+				background-color: var(--color_scheme_C_B);
+				text-align: center;
+}
+table.clagess_at_age_table td.odd_column_group { background-color: var(--color_scheme_C_D); }
+table.clagess_at_age_table td.even_column_group { background-color: var(--color_scheme_C_C); }
+table.clagess_at_age_table td.best_month { background-color: var(--color_scheme_B_A); }
+table.clagess_at_age_table .zero_dollars { color: var(--color_scheme_C_K); }
+table.clagess_at_age_table .negative_dollars {
+				background-color: #F0E0E0;
+				color: #FF0000;
+}
+table.clagess_at_age_table .notes {
+				background-color: var(--color_scheme_B_C);
+				background-color: var(--color_scheme_B_K);
+				font-size: smaller;
+				text-align: left;
+}
+
+/* The following was intended to fix the header, but have the body scroll vertically. That works, however, the
+   subsequent canvas (after the table) then gets lost - apparently it is behind the table.
+*/
+/*
+table.clagess_bank_balance_table,
+table.clagess_at_age_table thead { /* Fixed header, but the body scrolls vertically */
 				top: 0;
 				position: sticky;
 }
+*/
 
 #disclaimer {
 		background-color: #A0A0A0;
@@ -156,8 +190,8 @@ table.clagess_bank_balance_table thead { /* Fixed header, but the body scrolls v
 		<br>CLAGESS: Claiming Age Estimator for Social Security retirement benefits
 		-->
 
-		<div id="clagess_control_form"></div> <!-- The generate report(s) will be attached here. -->
-		<script>var new_table = clagess_create_input_form( "clagess_control_form" );</script>
+		<div id="clagess_control_form_id"></div> <!-- The generate report(s) will be attached here. -->
+		<script>var new_table = clagess_create_input_form( "clagess_control_form_id" );</script>
 
 	</body>
 </html>
