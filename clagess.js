@@ -268,7 +268,7 @@ function clagess_best_month_bank_balance( birth_year, age_at_death, interest_rat
 function clagess_generate_table_best_bank_balance( table_element, canvas_element, title, birth_year, birth_month_user=1, cola=0, pia=1000, age_at_death=100)
 {
 	let birth_month_adj = birth_month_user-1; // Users months are 1..12. Internally we use 0..11.
-	if(1) { console.log("XXXXXX   Enter clagess_generate_table_best_bank_balance(table_element=", table_element, ", canvas_element=", canvas_element, ", title=", title, ", birth_year=", birth_year, " birth_month: (user=", birth_month_user, ",adjusted=", birth_month_adj, ", cola=", cola, ", pia=", pia, ", age_at_death=", age_at_death ); }
+	if(0) { console.log("XXXXXX   Enter clagess_generate_table_best_bank_balance(table_element=", table_element, ", canvas_element=", canvas_element, ", title=", title, ", birth_year=", birth_year, " birth_month: (user=", birth_month_user, ",adjusted=", birth_month_adj, ", cola=", cola, ", pia=", pia, ", age_at_death=", age_at_death ); }
 
 	let col_hdrs = [];
 	let row_hdrs = [];
@@ -532,7 +532,7 @@ class Report_BankBalanceTable extends BaseReport {
 					"Claiming-Ages", "PIA", "Age at Death", "Arrears", "Pay Down Balance", "Borrow Interest Rate",
 					"Monthly Spending",
 					"Trust fund depletion year", "Trust fund depletion reduction",
-					"Animation Speed", "Max Animation Skew",
+					"Animation Speed", "Initial Animation Delay",
 					"Line Colors",
 					"Y Scale Max", "Y Scale Min",
 					"Buttons", "Errors", "Messages"],
@@ -581,7 +581,7 @@ class Report_BankBalanceTable extends BaseReport {
 		let tfdy = this.get_element("Trust fund depletion year");
 		let tfdr = this.get_element("Trust fund depletion reduction");
 		let animation_speed = this.get_element("Animation Speed");
-		let max_animation_skew = this.get_element("Max Animation Skew");
+		let initial_animation_delay = this.get_element("Initial Animation Delay");
 		let line_colors = this.get_element("Line Colors").value;
 		let y_scale_min_element = this.get_element("Y Scale Min");
 		let y_scale_min = y_scale_min_element.value;
@@ -604,7 +604,7 @@ class Report_BankBalanceTable extends BaseReport {
 			Number(paydownbalance.value), Number(borrow_irate.value),
 			Number(spendit.value),
 			Number(tfdy.value), Number(tfdr.value),
-			Number(animation_speed.value), Number(max_animation_skew.value),
+			Number(animation_speed.value), Number(initial_animation_delay.value),
 			line_colors,
 			y_scale_min, y_scale_max
 		);
@@ -616,8 +616,10 @@ class Report_BankBalanceTable extends BaseReport {
 class Report_ClaimingAgeTable extends BaseReport {
 	constructor (form_reports) {
 		super(form_reports, "ClaimingAgeTable", "Monthly Retirement Benefit - versus Claiming-Age",
-			["CLAGESS", "Report Type", "Title", "Birth year", "Birth month",
-					"PIA", /* "Table Placement", */ "Buttons", "Errors", "Messages"],
+			["CLAGESS", "Report Type", "Options", "Title", "Birth year", "Birth month",
+					"PIA",
+					"Animation Speed", "Initial Animation Delay",
+					"Buttons", "Errors", "Messages"],
 			ClaimingAgeTable_description
 //			"Shows potential monthly benefit for each of 96 (8 years X 12 months) potential ages to " +
 //			"start collecting Social Security Retirement Benefits. " +
@@ -631,7 +633,13 @@ class Report_ClaimingAgeTable extends BaseReport {
 		let birth_year = this.get_element("Birth year");
 		let birth_month = this.get_element("Birth month");
 		let pia = this.get_element("PIA");
-		let new_element = clagess_generate_payment_table( table_element, canvas_element, title.value, Number(birth_year.value), Number(birth_month.value), Number(pia.value) );
+		let animation_speed = this.get_element("Animation Speed");
+		let initial_animation_delay = this.get_element("Initial Animation Delay");
+		let new_element = clagess_generate_payment_table( table_element, canvas_element, title.value,
+				Number(birth_year.value), Number(birth_month.value),
+				Number(pia.value),
+				Number(animation_speed.value), Number(initial_animation_delay.value)
+		);
 		return new_element;
 	}
 }
@@ -727,7 +735,7 @@ class Report_Reverse extends BaseReport {
 		let tfdy = this.get_element("Trust fund depletion year");
 		let tfdr = this.get_element("Trust fund depletion reduction");
 		let animation_speed = this.get_element("Animation Speed");
-		let max_animation_skew = this.get_element("Max Animation Skew");
+		let initial_animation_delay = this.get_element("Initial Animation Delay");
 		let line_colors = this.get_element("Line Colors").value;
 		let y_scale_min_element = this.get_element("Y Scale Min");
 		let y_scale_min = y_scale_min_element.value;
@@ -749,7 +757,7 @@ class Report_Reverse extends BaseReport {
 			Number(paydownbalance.value), Number(borrow_irate.value),
 			Number(spendit.value),
 			Number(tfdy.value), Number(tfdr.value),
-			Number(animation_speed.value), Number(max_animation_skew.value),
+			Number(animation_speed.value), Number(initial_animation_delay.value),
 			line_colors,
 			y_scale_min, y_scale_max
 		);
@@ -765,7 +773,7 @@ class Report_AtAge extends BaseReport {
 					"PIA", "Pay Down Balance", "Borrow Interest Rate",
 					"Monthly Spending",
 					"Trust fund depletion year", "Trust fund depletion reduction",
-					"Animation Speed", "Max Animation Skew",
+					"Animation Speed", "Initial Animation Delay",
 					"Line Colors",
 					"Y Scale Max", "Y Scale Min",
 					"Buttons", "Errors", "Messages"],
@@ -803,7 +811,7 @@ class Report_AtAge extends BaseReport {
 		let tfdy = this.get_element("Trust fund depletion year");
 		let tfdr = this.get_element("Trust fund depletion reduction");
 		let animation_speed = this.get_element("Animation Speed");
-		let max_animation_skew = this.get_element("Max Animation Skew");
+		let initial_animation_delay = this.get_element("Initial Animation Delay");
 		let line_colors = this.get_element("Line Colors").value;
 		let y_scale_min_element = this.get_element("Y Scale Min");
 		let y_scale_min = y_scale_min_element.value;
@@ -822,7 +830,7 @@ class Report_AtAge extends BaseReport {
 			Number(paydownbalance.value), Number(borrow_irate.value),
 			Number(spendit.value),
 			Number(tfdy.value), Number(tfdr.value),
-			Number(animation_speed.value), Number(max_animation_skew.value),
+			Number(animation_speed.value), Number(initial_animation_delay.value),
 			target_ages,
 			line_colors,
 			y_scale_min, y_scale_max
@@ -1213,7 +1221,7 @@ class ClagessFormReports extends BaseFormReports
 
 	new ClagessFormRow(this, "CLAGESS", false, [  "innerHTML", "CLAGESS", "nextCell", "nop", "colspan", 3,
 			"innerHTML", "<b>Cl</b>aiming <b>Ag</b>e <b>E</b>stimator for <b>S</b>ocial <b>S</b>ecurity retirement benefits " +
-			"&nbsp;<small>version 0.23</small>",
+			"&nbsp;<small>version 0.24</small>",
 	], 0);
 
 		// DVO HELP - need to tweak the following to read the reports somehow from the BaseReport objects
@@ -1525,13 +1533,12 @@ class ClagessFormReports extends BaseFormReports
 	);
 
 
-	new ClagessFormRow(this, "Max Animation Skew", true, [ "innerHTML", "Max Animation Skew", "trclassadd", "clagess_table_row_max_animation_skew",
+	new ClagessFormRow(this, "Initial Animation Delay", true, [ "innerHTML", "Initial Animation Delay", "trclassadd", "clagess_table_row_initial_animation_delay",
 		"nextCell", "nop",
-		"element2", "input", "type", "text", /* "id", "form1_max_animation_skew_id", */ "value", 3000, "form_id", "",
+		"element2", "input", "type", "text", "value", 0, "form_id", "",
 		"nextCell", "nop", "nextCell", "nop", "class", "description",
-		"innerHTML", "<b>Optional</b>: A work-around for a known bug in Chart.js. Not used unless <b>Animation Speed</b> is enabled. " +
-				"Increase this value if you see an error about <b>animation delay</b> or <b>max_animation_skew</b>. " +
-				"Otherwise ignore this parameter.",
+		"innerHTML", "<b>Optional</b>: Not used unless <b>Animation Speed</b> is enabled. " +
+				"A delay in milliseconds (1000 = 1 second), before starting the animation. ",
 	      	"title", ""
 	], 8,
 	);
@@ -1647,9 +1654,9 @@ class ClagessFormReports extends BaseFormReports
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
-function clagess_generate_payment_table( table_element, canvas_element, title, birth_year, birth_month_user, pia=1000 )
+function clagess_generate_payment_table( table_element, canvas_element, title, birth_year, birth_month_user, pia=1000, animation_speed=0, initial_animation_delay=0 )
 {
-	if (0) { console.log("Enter clagess_generate_payment_table(table_element=", table_element, ", canvas_element=", canvas_element, ", title=", title, ", birth_year=", birth_year, ", birth_month_user=", birth_month_user, ", pia=", pia, ")"); }
+	if (0) { console.log("Enter clagess_generate_payment_table(table_element=", table_element, ", canvas_element=", canvas_element, ", title=", title, ", birth_year=", birth_year, ", birth_month_user=", birth_month_user, ", pia=", pia, ", animation_speed=", animation_speed, ", initial_animation_delay=", initial_animation_delay, ")"); }
 
 	//let my_parent = document.getElementById(parent_id);
 	//if (my_parent == null) { console.log("ERROR: no element found with id=", parent_id); return null; }
@@ -1743,11 +1750,13 @@ function clagess_generate_payment_table( table_element, canvas_element, title, b
 
 		cell = body_row.insertCell();
 		cell.innerHTML = (months_after_62 == 0) ? "" :
-				(parseFloat( 100*clagess_monthly_benefit[months_after_62].benefit / clagess_monthly_benefit[ months_after_62-1].benefit -100 ).toFixed(2) + "%");
+				("$" + parseFloat( dollar_amount[months_after_62] - dollar_amount[months_after_62-1]).toFixed(2) + " " +
+					parseFloat( 100*clagess_monthly_benefit[months_after_62].benefit / clagess_monthly_benefit[ months_after_62-1].benefit -100 ).toFixed(2) + "%");
 
 		cell = body_row.insertCell();
 		cell.innerHTML = (months_after_62 < 12) ? "" :
-				(parseFloat( 100*clagess_monthly_benefit[months_after_62].benefit / clagess_monthly_benefit[ months_after_62-12].benefit -100 ).toFixed(2) + "%");
+				("$" + parseFloat(dollar_amount[months_after_62] - dollar_amount[months_after_62-12]).toFixed(2) + " " +
+					parseFloat( 100*clagess_monthly_benefit[months_after_62].benefit / clagess_monthly_benefit[ months_after_62-12].benefit -100 ).toFixed(2) + "%");
 
 		cell = body_row.insertCell();
 		cell.innerHTML = parseFloat( (100* clagess_monthly_benefit[months_after_62].benefit / clagess_monthly_benefit[0].benefit )).toFixed(1) + "%";
@@ -1787,6 +1796,9 @@ function clagess_generate_payment_table( table_element, canvas_element, title, b
 		//let ctx = document.createElement("canvas");
 		//ctx.id = "myChart";
 		////my_parent.appendChild(ctx);
+		const delay_between_points = (animation_speed * 10) / (datasets[0].data.length+1); // +1 to avoid possible divide by 0
+		const delay_between_datasets = (animation_speed > 0) ? 4000 : 0;
+		//console.log("inital_animation_delay=", initial_animation_delay, ", animation_speed=", animation_speed, ", delay_between_points=", delay_between_points, ", delay_between_datasets=", delay_between_datasets );
 		my_config = {
 //			type: "line",
 			type: "bar",
@@ -1850,7 +1862,18 @@ function clagess_generate_payment_table( table_element, canvas_element, title, b
 						title: { display: true, text: ["Claiming-Age", "Calendar Date, Age (Year:Months)", "(when started collecting SS retirement benefits)"] }
 					}
 				},
-				//animation: my_animation,
+				animation: {
+					x: { // Attempt to draw one dataset at a time.
+						duration: 1000,
+						from: NaN,
+						delay(the_canvas) {
+							if (the_canvas.type !== 'data') { return 0; }
+							return initial_animation_delay +
+								the_canvas.datasetIndex * delay_between_datasets +
+								the_canvas.index * delay_between_points;
+						},
+					}
+				},
 				onClick: (e) => {
 					if (my_chart != null) {
 						my_chart.destroy();
@@ -1872,7 +1895,7 @@ function clagess_generate_table_bank_balance_V1( the_table, the_canvas,
 	cola_percent=0, pia=1000, arrears=0, messages_id=null,
 	paydownbalance=0, borrow_irate=0, spendit=0,
 	tfdy=0, tfdr_percent=0,
-	animation_speed=0, max_animation_skew_ms = 3000,
+	animation_speed=0, initial_animation_delay = 0,
 	line_colors=undefined,
 	y_scale_min=undefined, y_scale_max=undefined)
 // birth_month_user should be 1..12
@@ -1889,10 +1912,17 @@ function clagess_generate_table_bank_balance_V1( the_table, the_canvas,
 		", paydownbalance=", paydownbalance, ", borrow_irate=", borrow_irate,
 		", spendit=", spendit,
 		", tfdy=", tfdy, ", tfdr=", tfdr_percent,
-		", animation_speed=", animation_speed, ", max_animation_skew_ms=", max_animation_skew_ms,
+		", animation_speed=", animation_speed, ", initial_animation_delay=", initial_animation_delay,
 		", line_colors=", line_colors,
 		", y_scale_min=", y_scale_min, ", y_scale_max=", y_scale_max, ")" );
 	}
+
+	let enable_best_claiming_age_column = false;
+	if (0) {
+		enable_best_claiming_age_column = false;
+		console.log("Intended for special case only! enable_best_claiming_age_column=", enable_best_claiming_age_column);
+	}
+
 
 	if (true) { // argument checking
 		let error_count = 0;
@@ -1953,8 +1983,8 @@ function clagess_generate_table_bank_balance_V1( the_table, the_canvas,
 			ErrorMessage(messages_id, "ERROR: animation_speed="+ animation_speed+ ", seems out of range of reasonable values.");
 			error_count++;
 		}
-		if (!isNumber(max_animation_skew_ms) || (max_animation_skew_ms < 0) || (max_animation_skew_ms > 100000) ) {
-			ErrorMessage(messages_id, "ERROR: max_animation_skew="+ max_animation_skew_ms+ ", seems out of range of reasonable values.");
+		if (!isNumber(initial_animation_delay) || (initial_animation_delay < 0) ) {
+			ErrorMessage(messages_id, "ERROR: initial_animation_delay="+ initial_animation_delay+ ", seems out of range of reasonable values.");
 			error_count++;
 		}
 
@@ -1978,8 +2008,10 @@ function clagess_generate_table_bank_balance_V1( the_table, the_canvas,
 		}
 	}
 
-	let num_data_columns = claiming_age_array.length * 3;
-	let num_irates = interest_percent_array.length;
+	const num_irates = interest_percent_array.length;
+	const has_nonzero_irate = (num_irates > 1) || (Number(interest_percent_array[0]) !== 0) || (Number(borrow_irate) !== 0);
+	const num_data_columns = claiming_age_array.length * (has_nonzero_irate ? 3 : 2);
+
 
 	let cell = null;
 	let col_label = [];
@@ -2032,7 +2064,7 @@ function clagess_generate_table_bank_balance_V1( the_table, the_canvas,
 		th.title = "Monthly deduction from the Bank Balance" + ((claiming_age_array.length > 1) ? "(s)" : "") +
 			" of $" + spendit +
 			". If Bank Balance is negative, then interest is charged at an annual rate of " + borrow_irate + "%.";
-		th.rowSpan = 3
+		th.rowSpan = "3";
 		hrow1.appendChild(th);
 	}
 
@@ -2044,7 +2076,7 @@ function clagess_generate_table_bank_balance_V1( the_table, the_canvas,
 	hrow1.appendChild(th);
 
 
-	if (claiming_age_array.length > 1) {
+	if (enable_best_claiming_age_column && (claiming_age_array.length > 1)) {
 		let th = document.createElement("th");
 		th.innerHTML = "Best Claiming-Age";
 		th.title = "For each row, identifies the Claiming-Age with highest Bank Balance.";
@@ -2066,7 +2098,7 @@ function clagess_generate_table_bank_balance_V1( the_table, the_canvas,
 			col_label.push( this_column_label );
 			col_claiming_age.push( claiming_age );
 			th.title = "Claiming-Age: " + clagess_to_years_months( claiming_age );
-			th.colSpan = "3";
+			th.colSpan = has_nonzero_irate ? "3" : "2";
 			th.classList.add(odd_column_group ? "odd_column_group" : "even_column_group");
 			hrow2.appendChild(th);
 		}
@@ -2079,6 +2111,7 @@ function clagess_generate_table_bank_balance_V1( the_table, the_canvas,
 	for (claiming_age of claiming_age_array) {
 		for (irate of interest_percent_array) {
 			odd_column_group = ! odd_column_group;
+			if (has_nonzero_irate) {
 			let th = document.createElement("th");
 			th.innerHTML = "Interest on Balance ($)";
 			th.title = (paydownbalance == 0)
@@ -2088,8 +2121,9 @@ function clagess_generate_table_bank_balance_V1( the_table, the_canvas,
 				;
 			th.classList.add(odd_column_group ? "odd_column_group" : "even_column_group");
 			hrow3.appendChild(th);
+			}
 
-			th = document.createElement("th");
+			let th = document.createElement("th");
 			th.innerHTML = "Benefit payment from SSA ($)";
 			th.title = "Payment from the Social Security Administration (i.e. the monthly benefit). Doesn't start until Claiming-Age ("+clagess_to_years_months(claiming_age,2)+", adjusted for COLA ("+cola_percent+"%) every January.";
 			th.classList.add(odd_column_group ? "odd_column_group" : "even_column_group");
@@ -2163,10 +2197,9 @@ function clagess_generate_table_bank_balance_V1( the_table, the_canvas,
 			spendit_cell.outerHTML = "<th>" + spendit + "</th>";
 		}
 
-		console.log("line_colors=", line_colors, ", length=", line_colors.length );
 		let line_colors_cleaned = undefined;
 		if ((line_colors != undefined ) && (line_colors.length > 0)) { line_colors_cleaned = line_colors.split(" "); }
-		console.log("line_colors_cleaned=", line_colors_cleaned );
+		//console.log("line_colors_cleaned=", line_colors_cleaned );
 
 		let best_balance = 0;
 		let best_balance_col_index = 0;
@@ -2182,18 +2215,21 @@ function clagess_generate_table_bank_balance_V1( the_table, the_canvas,
 						if (array_length >= 1) {
 							let this_index = col_index % array_length;
 							this_line_color = line_colors_cleaned[ this_index ];
-							console.log("col_index=", col_index, ", row_index=", row_index, ", this_index=", this_index, ", this_line_color=", this_line_color );
+							//console.log("col_index=", col_index, ", row_index=", row_index, ", this_index=", this_index, ", this_line_color=", this_line_color );
 						}
 					}
 					datasets.push( { label: clagess_to_years_months( claiming_age, 3 ) + ((num_irates > 1) ? " @ " + String(irate) + "%" : ""),
 							fill: false,
 							borderColor: clagess_list_to_value( line_colors, col_index ),
+						borderWidth: 1,
+						pointRadius: 0,
 							data: []
 							} );
 				}
 
 				odd_column_group = ! odd_column_group;
 				let this_interest = (balance[col_index] >= 0) ?  (balance[col_index] * interest_per_month) : (balance[col_index] * borrow_irate/100 / 12)
+				if (has_nonzero_irate) {
 				let innercell = body_row.insertCell();
 				innercell.classList.add(odd_column_group ? "odd_column_group" : "even_column_group");
 				if (months_after_62 >= 0) {
@@ -2201,6 +2237,7 @@ function clagess_generate_table_bank_balance_V1( the_table, the_canvas,
 					if (put_negative_values_in_parenthesis && (this_interest < 0) ) { innercell.innerHTML = "(" + innercell.innerHTML + ")"; }
 					if (this_interest < 0) { innercell.classList.add( "negative_dollars" ); }
 					if (this_interest ==  0) { innercell.classList.add("zero_dollars"); }
+				}
 				}
 
 				cell = body_row.insertCell();
@@ -2241,7 +2278,7 @@ function clagess_generate_table_bank_balance_V1( the_table, the_canvas,
 			} // for irate
 		} // for ii < claiming_age_array.length - column groups
 
-		if (claiming_age_array.length > 1) {
+		if (enable_best_claiming_age_column && (claiming_age_array.length > 1)) {
 			cell = body_row.insertCell();
 			cell.innerHTML = col_label[ best_balance_col_index ];
 			cell.style.backgroundColor = clagess_color_interpolate( (col_claiming_age[ best_balance_col_index ] -62) * 12 / 96 );
@@ -2255,7 +2292,7 @@ function clagess_generate_table_bank_balance_V1( the_table, the_canvas,
 	let notes_row = tbody.insertRow(-1);
 	let notes_cell = notes_row.insertCell();
 	notes_cell.classList.add( "notes" );
-	let number_of_columns = 4 + claiming_age_array.length * num_irates * 3 + ((claiming_age_array.length > 1) ? 1 : 0);
+	let number_of_columns = 4 + claiming_age_array.length * num_irates * (has_nonzero_irate?3:2) + ((claiming_age_array.length > 1) ? 1 : 0);
 	notes_cell.setAttribute("colspan", number_of_columns);
 	let the_HTML = "<b>Notes</b>:<ol>";
 	the_HTML += "<li>The Social Security Administration pays benefits the month after (e.g. the June benefit is paid in July).";
@@ -2297,20 +2334,22 @@ function clagess_generate_table_bank_balance_V1( the_table, the_canvas,
 	}
 
 	if (the_canvas !== null) { // plot
-		//let ctx = document.createElement("canvas");
-		//ctx.id = "myChart";
-		//my_parent.appendChild(ctx);
-
-
-		const delay_between_points = (animation_speed * 10) / (datasets[0].data.length+1); // +1 to avoid possible divide by 0
-		const delay_between_datasets = (animation_speed > 0) ? 4000 : 0;
+		let delay_between_points = (animation_speed * 10) / (datasets[0].data.length+1); // +1 to avoid possible divide by 0
+		let delay_between_datasets = (animation_speed > 0) ? 4000 : 0;
+		if (false) { // hard-coded for a specific use-case
+			delay_between_points = 1;
+			delay_between_datasets = 100;
+			initial_animation_delay = 4000;
+		}
 		my_animation = {
 			x: { // Attempt to draw one dataset at a time.
 				duration: 1000,
 				from: NaN,
 				delay(the_canvas) {
 					if (the_canvas.type !== 'data') { return 0; }
-						return the_canvas.datasetIndex * delay_between_datasets + the_canvas.index * delay_between_points;
+						return initial_animation_delay +
+							the_canvas.datasetIndex * delay_between_datasets +
+							the_canvas.index * delay_between_points;
 				},
 			}
 		}
@@ -2382,8 +2421,8 @@ function clagess_generate_table_bank_balance_V1( the_table, the_canvas,
 			}
 		}
 
-		console.log("the_canvas=", the_canvas );
-		console.log("my_config=", my_config );
+		//console.log("the_canvas=", the_canvas );
+		//console.log("my_config=", my_config );
 		my_chart = new Chart(the_canvas.getContext("2d"), my_config );
 	}
 
@@ -2397,7 +2436,7 @@ function clagess_generate_table_bank_balance_V2( the_table, the_canvas,
 	cola_percent=0, pia=1000, messages_id=null,
 	paydownbalance=0, borrow_irate=0, spendit=0,
 	tfdy=0, tfdr_percent=0,
-	animation_speed=0, max_animation_skew_ms = 3000,
+	animation_speed=0, initial_animation_delay = 0,
 	target_ages,
 	line_colors=undefined,
 	y_scale_min=undefined, y_scale_max=undefined)
@@ -2415,7 +2454,7 @@ function clagess_generate_table_bank_balance_V2( the_table, the_canvas,
 		", paydownbalance=", paydownbalance, ", borrow_irate=", borrow_irate,
 		", spendit=", spendit,
 		", tfdy=", tfdy, ", tfdr=", tfdr_percent,
-		", animation_speed=", animation_speed, ", max_animation_skew_ms=", max_animation_skew_ms,
+		", animation_speed=", animation_speed, ", initial_animation_delay=", initial_animation_delay,
 		", target_ages=", target_ages,
 		", line_colors=", line_colors,
 		", y_scale_min=", y_scale_min, ", y_scale_max=", y_scale_max,
@@ -2462,8 +2501,8 @@ function clagess_generate_table_bank_balance_V2( the_table, the_canvas,
 			ErrorMessage(messages_id, "ERROR: animation_speed="+ animation_speed+ ", seems out of range of reasonable values.");
 			error_count++;
 		}
-		if (!isNumber(max_animation_skew_ms) || (max_animation_skew_ms < 0) || (max_animation_skew_ms > 100000) ) {
-			ErrorMessage(messages_id, "ERROR: max_animation_skew="+ max_animation_skew_ms+ ", seems out of range of reasonable values.");
+		if (!isNumber(initial_animation_delay) || (initial_animation_delay < 0) ) {
+			ErrorMessage(messages_id, "ERROR: initial_animation_delay="+ initial_animation_delay+ ", seems out of range of reasonable values.");
 			error_count++;
 		}
 
@@ -2529,9 +2568,7 @@ function clagess_generate_table_bank_balance_V2( the_table, the_canvas,
 			}
 		}
 		max_dollars_per_ta_index.push( max_dollars );
-		console.log("ta_index=", ta_index, ", target_age=", target_age, ", max_dollars=", max_dollars );
 	}
-	console.log("max_dollars_per_ta_index=", max_dollars_per_ta_index);
 
 
 	// Now have the desired data in data_cache
@@ -2684,7 +2721,9 @@ function clagess_generate_table_bank_balance_V2( the_table, the_canvas,
 				from: NaN,
 				delay(the_canvas) {
 					if (the_canvas.type !== 'data') { return 0; }
-						return the_canvas.datasetIndex * delay_between_datasets + the_canvas.index * delay_between_points;
+						return initial_animation_delay +
+							the_canvas.datasetIndex * delay_between_datasets +
+							the_canvas.index * delay_between_points;
 				},
 			}
 		}
@@ -2758,8 +2797,6 @@ function clagess_generate_table_bank_balance_V2( the_table, the_canvas,
 			}
 		}
 
-		console.log("the_canvas=", the_canvas );
-		console.log("my_config=", my_config );
 		my_chart = new Chart(the_canvas.getContext("2d"), my_config );
 	}
 
@@ -2773,7 +2810,7 @@ function clagess_generate_table_bank_balance_V3( the_table, the_canvas,
 	cola_percent=0, pia=1000, arrears=0, messages_id=null,
 	paydownbalance=0, borrow_irate=0, spendit=0,
 	tfdy=0, tfdr_percent=0,
-	animation_speed=0, max_animation_skew_ms = 3000,
+	animation_speed=0, initial_animation_delay = 0,
 	line_colors=undefined,
 	y_scale_min=undefined, y_scale_max=undefined)
 // birth_month_user should be 1..12
@@ -2790,7 +2827,7 @@ function clagess_generate_table_bank_balance_V3( the_table, the_canvas,
 		", paydownbalance=", paydownbalance, ", borrow_irate=", borrow_irate,
 		", spendit=", spendit,
 		", tfdy=", tfdy, ", tfdr=", tfdr_percent,
-		", animation_speed=", animation_speed, ", max_animation_skew_ms=", max_animation_skew_ms,
+		", animation_speed=", animation_speed, ", initial_animation_delay=", initial_animation_delay,
 		", line_colors=", line_colors,
 		", y_scale_min=", y_scale_min, " y_scale_max=", y_scale_max, ")" );
 	}
@@ -2854,8 +2891,8 @@ function clagess_generate_table_bank_balance_V3( the_table, the_canvas,
 			ErrorMessage(messages_id, "ERROR: animation_speed="+ animation_speed+ ", seems out of range of reasonable values.");
 			error_count++;
 		}
-		if (!isNumber(max_animation_skew_ms) || (max_animation_skew_ms < 0) || (max_animation_skew_ms > 100000) ) {
-			ErrorMessage(messages_id, "ERROR: max_animation_skew="+ max_animation_skew_ms+ ", seems out of range of reasonable values.");
+		if (!isNumber(initial_animation_delay) || (initial_animation_delay < 0) ) {
+			ErrorMessage(messages_id, "ERROR: initial_animation_delay="+ initial_animation_delay+ ", seems out of range of reasonable values.");
 			error_count++;
 		}
 
@@ -2984,7 +3021,9 @@ function clagess_generate_table_bank_balance_V3( the_table, the_canvas,
 				from: NaN,
 				delay(the_canvas) {
 					if (the_canvas.type !== 'data') { return 0; }
-						return the_canvas.datasetIndex * delay_between_datasets + the_canvas.index * delay_between_points;
+						return initial_animation_delay +
+							the_canvas.datasetIndex * delay_between_datasets +
+							the_canvas.index * delay_between_points;
 				},
 			}
 		}
@@ -3049,8 +3088,6 @@ function clagess_generate_table_bank_balance_V3( the_table, the_canvas,
 			}
 		}
 
-		console.log("the_canvas=", the_canvas );
-		console.log("my_config=", my_config );
 		my_chart = new Chart(the_canvas.getContext("2d"), my_config );
 	}
 
@@ -3074,8 +3111,6 @@ function clagess_generate_actuarial_table(  table_element, canvas_element, title
 	const age_62 = ss_period_life_table_2020[62];
 	// 1st index is age in years.
 	// 2nd index : 0=age, 1=Male Death Probability (that year), 2=Male Number of lives, 3=Male Life expectance, 4,5,6 repeat 1-3 for Female
-	console.log("age_62=", age_62);
-	console.log("The title=", title);
 	for (let age=62; age <= age_at_death; age++) {
 		const male_survival_percentage = 100* ss_period_life_table_2020[age][2] / ss_period_life_table_2020[62][2];
 		const female_survival_percentage = 100* ss_period_life_table_2020[age][2+3] / ss_period_life_table_2020[62][2+3];
@@ -3092,8 +3127,8 @@ function clagess_generate_actuarial_table(  table_element, canvas_element, title
 //	let ctx = document.createElement("canvas");
 //	ctx.id = "myChart";
 //	my_parent.appendChild(ctx);
-	datasets.push( { label: "Male", fill: false, borderWidth: 1, borderColor: "blue", data: survival_from_62_male } );
-	datasets.push( { label: "Female", fill: false, borderWidth: 1, borderColor: "pink", data: survival_from_62_female } );
+	datasets.push( { label: "Male", fill: false, borderWidth: 5, borderColor: "blue", data: survival_from_62_male } );
+	datasets.push( { label: "Female", fill: false, borderWidth: 5, borderColor: "pink", data: survival_from_62_female } );
 
 	if (1) { // plot
 //		let ctx = document.createElement("canvas");

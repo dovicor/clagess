@@ -162,14 +162,10 @@ table.clagess_at_age_table .notes {
 
 /* The following was intended to fix the header, but have the body scroll vertically. That works, however, the
    subsequent canvas (after the table) then gets lost - apparently it is behind the table.
+  5/5/2024 - now it seems to be working ok, not sure what changed.
 */
-/*
-table.clagess_bank_balance_table,
-table.clagess_at_age_table thead { /* Fixed header, but the body scrolls vertically */
-				top: 0;
-				position: sticky;
-}
-*/
+table.clagess_bank_balance_table thead { top: 0; position: sticky; }
+table.clagess_at_age_table thead { top: 0; position: sticky; }
 
 #disclaimer {
 		background-color: #A0A0A0;
